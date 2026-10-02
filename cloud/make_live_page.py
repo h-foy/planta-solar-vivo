@@ -1,6 +1,6 @@
 """Build the live phone page (index.html) from the newest MeterReader PRN pair.
 
-    python make_live_page.py <PRN folder> <output folder>
+    python make_live_page.py <PRN folder> <output folder> [--history <folder with past full days>]
 
 Reads the newest date that has both meters (AGRIM02P = solar, DAGSR01P = grid connection),
 preferring the latest partial "_hasta_HHMM" file, and writes a single self-contained
@@ -45,6 +45,40 @@ def newest_pair(src):
     return d, found[d]['AGRIM02P'][1], found[d]['DAGSR01P'][1]
 
 
+def history(dirs, today, ndays=4):
+    """Hourly sums for the ndays complete days before `today` (YYYYMMDD), oldest first.
+    Looks for full-day files (no _hasta_) in the given folders and their subfolders."""
+    files = {}
+    for d in dirs:
+        if not d or not os.path.isdir(d):
+            continue
+        for p in glob.glob(os.path.join(d, '**', '*.PRN'), recursive=True):
+            m = PAT.search(os.path.basename(p))
+            if m and not m.group(3) and '_discarded' not in p and 'parciales' not in p:
+                files.setdefault(m.group(2), {})[m.group(1).upper()] = p
+    t0 = dt.datetime.strptime(today, '%Y%m%d')
+    out = []
+    for k in range(ndays, 0, -1):
+        day = (t0 - dt.timedelta(days=k)).strftime('%Y%m%d')
+        pair = files.get(day, {})
+        if len(pair) < 2:
+            continue
+        ag, ds = parse(pair['AGRIM02P']), parse(pair['DAGSR01P'])
+        n = min(len(ag), len(ds), 96)
+        hours = {'sol': [], 'inj': [], 'grd': []}
+        for h in range(24):
+            if 4 * h + 4 <= n:
+                rows = range(4 * h, 4 * h + 4)
+                hours['sol'].append(round(sum(ag[i][0] for i in rows), 3))
+                hours['inj'].append(round(sum(ds[i][0] for i in rows), 3))
+                hours['grd'].append(round(sum(ds[i][1] for i in rows), 3))
+            else:
+                for v in hours.values():
+                    v.append(None)
+        out.append({'date': f'{day[:4]}-{day[4:6]}-{day[6:]}', **hours})
+    return out
+
+
 def camera_url():
     """Camera address for the page, or '' when not set up yet.
     Either a still-photo URL ending in .jpg/.jpeg/.png (e.g. https://assets1.webcam.io/w/<ID>/latest.jpg,
@@ -62,7 +96,7 @@ def camera_url():
     return url if url.startswith('https://') else ''
 
 
-def build(src, dest, snapshot=False):
+def build(src, dest, snapshot=False, hist_dirs=()):
     day, ag_p, ds_p = newest_pair(src)
     ag, ds = parse(ag_p), parse(ds_p)
     n = min(len(ag), len(ds), 96)
@@ -79,6 +113,7 @@ def build(src, dest, snapshot=False):
         'sol': sol, 'inj': inj, 'grd': grd,
         'snapshot': snapshot,
         'cam': camera_url(),
+        'hist': history([src, *hist_dirs], day),
     }
     html = TEMPLATE.replace('/*DATA*/null', json.dumps(data, separators=(',', ':')))
     if snapshot:   # page body only (the publisher adds its own document skeleton)
@@ -93,7 +128,8 @@ def build(src, dest, snapshot=False):
     with open(tmp, 'w', encoding='utf-8') as f:
         f.write(html)
     os.replace(tmp, out)
-    print(f'{data["date"]}  {n}/96 intervals, up to {data["last"]}  ->  {out}')
+    print(f'{data["date"]}  {n}/96 intervals, up to {data["last"]}, history days: '
+          f'{", ".join(h["date"][5:] for h in data["hist"]) or "none"}  ->  {out}')
     return out
 
 
@@ -180,6 +216,16 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .cam .msg{position:absolute;inset:0;display:grid;place-items:center;color:#ccc;font-size:13px;padding:12px;text-align:center}
 .cam .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--ink2)}
 .cam button.close{border:1px solid var(--rule);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 2px}
+.hd h2{margin:0}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:9px;padding:2px;background:var(--bg)}
+.seg button{border:0;background:transparent;color:var(--ink2);font:inherit;font-size:13px;padding:5px 11px;border-radius:7px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg button:focus-visible{outline:2px solid var(--inject);outline-offset:1px}
+.seg button[disabled]{opacity:.45;cursor:default}
+.days{margin:10px 2px 4px}
+.days table{font-size:12px}
+.days td.today{font-weight:600}
 details{margin:12px 0}
 summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 2px}
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
@@ -218,11 +264,18 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     </div>
   </section>
 
-  <section class="card">
-    <h2>Por hora</h2>
-    <p class="note">Solo horas completas (la hora 13:00 = de 13:00 a 14:00).</p>
+  <section class="card" id="hourCard">
+    <div class="hd">
+      <h2 id="h60">Por hora</h2>
+      <div class="seg" role="group" aria-label="Período del gráfico por hora">
+        <button type="button" id="segDay" aria-pressed="true">Hoy</button>
+        <button type="button" id="seg5" aria-pressed="false">5 días</button>
+      </div>
+    </div>
+    <p class="note" id="n60">Solo horas completas (la hora 13:00 = de 13:00 a 14:00).</p>
     <div class="legend" id="legend2"></div>
     <div class="chart" id="c60"></div>
+    <div class="days" id="days5" hidden></div>
   </section>
 
   <section class="tiles" id="tiles" aria-label="Hoy hasta ahora"></section>
@@ -312,7 +365,8 @@ function niceStep(range, target){
   const raw = range/target, p = Math.pow(10, Math.floor(Math.log10(raw)));
   const m = raw/p; return (m<=1?1:m<=2?2:m<=2.5?2.5:m<=5?5:10)*p;
 }
-function chart(el, d, slots, labelEvery, labelFn, tipLabel){
+function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
+  opt = opt || {};
   const box0 = document.getElementById(el);
   const W = Math.max(300, Math.round(box0.clientWidth || 340));
   const Hh = Math.round(Math.min(320, Math.max(210, W*0.58))), pl = 34, pr = 6, pt = 10, pb = 24;
@@ -331,8 +385,15 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel){
     s += '<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+yy+'" y2="'+yy+'" stroke="'+(Math.abs(v)<1e-9?col('--axis'):col('--grid'))+'" stroke-width="1"/>';
     s += '<text x="'+(pl-6)+'" y="'+(yy+4)+'" text-anchor="end" font-size="11" fill="'+col('--ink3')+'">'+fmt(Math.abs(v),0)+'</text>';
   }
-  for (let i=0;i<slots;i+=labelEvery){
-    s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+labelFn(i)+'</text>';
+  if (opt.ticks){
+    for (const [i,txt] of opt.ticks)
+      s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+txt+'</text>';
+    for (const i of (opt.seps||[]))
+      s += '<line x1="'+(pl+i*bw)+'" x2="'+(pl+i*bw)+'" y1="'+pt+'" y2="'+(pt+ih)+'" stroke="'+col('--axis')+'" stroke-width="1" stroke-dasharray="2 3"/>';
+  } else {
+    for (let i=0;i<slots;i+=labelEvery){
+      s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+labelFn(i)+'</text>';
+    }
   }
   const y0 = y(0);
   // rounded-end bar path: rounded at the far end only, anchored to the baseline
@@ -355,9 +416,14 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel){
     if (j>0) s += bar(x, y0, y(-j), cI, false);
   }
   // solar line
-  let p = '', pts = [];
-  for (let i=0;i<slots;i++){ if (d.sol[i]==null) break; pts.push([pl+i*bw+bw/2, y(d.sol[i])]); }
-  if (pts.length){ p = 'M'+pts.map(t=>t[0].toFixed(1)+','+t[1].toFixed(1)).join('L');
+  let p = '', pts = [], segs = [];
+  for (let i=0;i<slots;i++){
+    if (d.sol[i]==null){ if (pts.length) segs.push(pts); pts = []; continue; }
+    pts.push([pl+i*bw+bw/2, y(d.sol[i])]);
+  }
+  if (pts.length) segs.push(pts);
+  pts = segs.length ? segs[segs.length-1] : [];
+  if (pts.length){ p = segs.map(sg => 'M'+sg.map(t=>t[0].toFixed(1)+','+t[1].toFixed(1)).join('L')).join('');
     s += '<path d="'+p+'" fill="none" stroke="'+cCard+'" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>';
     s += '<path d="'+p+'" fill="none" stroke="'+cS+'" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>';
     const lp = pts[pts.length-1];
@@ -388,9 +454,59 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel){
   svg.addEventListener('touchstart', show, {passive:true}); svg.addEventListener('touchmove', show, {passive:true});
   document.addEventListener('touchstart', e => { if (!box.contains(e.target)) hide(); }, {passive:true});
 }
+// ---- 5-day view: previous days (hourly) + today's complete hours ----
+const dname = iso => { const t = new Date(iso+'T12:00:00');
+  return t.toLocaleDateString('es-AR',{weekday:'short'}).replace('.','')+' '+t.getDate(); };
+const F = (function(){
+  const hist = D.hist || [];
+  if (!hist.length) return null;
+  const f = {sol:[],inj:[],grd:[],onsite:[],ticks:[],seps:[],lab:[]};
+  const add = (iso, sol, inj, grd) => {
+    const base = f.sol.length;
+    if (base) f.seps.push(base);
+    f.ticks.push([base+12, dname(iso)]);
+    for (let h=0;h<24;h++){
+      const s0 = sol[h], j = inj[h], g = grd[h];
+      f.sol.push(s0); f.inj.push(j); f.grd.push(g);
+      f.onsite.push(s0==null ? null : Math.max(0, s0-j));
+      f.lab.push([iso,h]);
+    }
+  };
+  for (const d of hist) add(d.date, d.sol, d.inj, d.grd);
+  add(D.date, H.sol, H.inj, H.grd);
+  f.tip = i => { const [iso,h] = f.lab[i]; const t = new Date(iso+'T12:00:00');
+    return t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'numeric'}).replace('.','')+' · '+hhmm(h*60)+'–'+hhmm(h*60+60); };
+  // per-day totals
+  const tot = a => a.reduce((t,x)=>t+(x||0),0);
+  const rows = hist.map(d => [d.date, tot(d.sol), tot(d.grd), tot(d.inj), false]);
+  rows.push([D.date, T.sol, T.grd, T.inj, true]);
+  let tb = '<table><thead><tr><th>Día</th><th>Solar</th><th>Comprada a la red</th><th>Inyectada</th></tr></thead><tbody>';
+  for (const [iso,a,b,c,today] of rows)
+    tb += '<tr><td'+(today?' class="today"':'')+'>'+dname(iso)+(today?' (hasta '+D.last+')':'')+'</td><td>'+fmt(a,0)+'</td><td>'+fmt(b,0)+'</td><td>'+fmt(c,0)+'</td></tr>';
+  document.getElementById('days5').innerHTML = tb + '</tbody></table>';
+  return f;
+})();
+let mode5 = false;
+try { mode5 = localStorage.getItem('vista60') === '5d'; } catch(e) {}
+function setMode(five){
+  mode5 = !!(five && F);
+  document.getElementById('segDay').setAttribute('aria-pressed', String(!mode5));
+  document.getElementById('seg5').setAttribute('aria-pressed', String(mode5));
+    document.getElementById('n60').textContent = mode5
+    ? 'Últimos 5 días: los 4 días anteriores y hoy hasta la última hora completa. Totales por día (kWh) debajo del gráfico.'
+    : 'Solo horas completas (la hora 13:00 = de 13:00 a 14:00).';
+  document.getElementById('days5').hidden = !mode5;
+  try { localStorage.setItem('vista60', mode5 ? '5d' : 'hoy'); } catch(e) {}
+}
+if (!F){ const b = document.getElementById('seg5'); b.disabled = true; b.title = 'Todavía no hay días anteriores guardados'; }
+document.getElementById('segDay').addEventListener('click', () => { setMode(false); draw(); });
+document.getElementById('seg5').addEventListener('click', () => { setMode(true); draw(); });
+setMode(mode5);
+
 function draw(){
   chart('c15', q, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15));
-  chart('c60', H, 24, 3, i => hhmm(i*60), i => hhmm(i*60)+'–'+hhmm(i*60+60));
+  if (mode5 && F) chart('c60', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps});
+  else chart('c60', H, 24, 3, i => hhmm(i*60), i => hhmm(i*60)+'–'+hhmm(i*60+60));
 }
 draw();
 
@@ -464,6 +580,12 @@ if (!D.snapshot) setTimeout(() => { location.replace(location.pathname + '?t=' +
 '''
 
 if __name__ == '__main__':
-    a = [x for x in sys.argv[1:] if x != '--snapshot']
-    build(a[0] if a else os.path.join(HERE, 'Output'), a[1] if len(a) > 1 else os.path.join(HERE, 'live'),
-          snapshot='--snapshot' in sys.argv)
+    args, hist = [], []
+    it = iter(sys.argv[1:])
+    for x in it:
+        if x == '--history':
+            hist.append(next(it, ''))
+        elif x != '--snapshot':
+            args.append(x)
+    build(args[0] if args else os.path.join(HERE, 'Output'), args[1] if len(args) > 1 else os.path.join(HERE, 'live'),
+          snapshot='--snapshot' in sys.argv, hist_dirs=hist)
