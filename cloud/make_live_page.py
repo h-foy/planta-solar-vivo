@@ -45,6 +45,23 @@ def newest_pair(src):
     return d, found[d]['AGRIM02P'][1], found[d]['DAGSR01P'][1]
 
 
+def camera_url():
+    """Camera address for the page, or '' when not set up yet.
+    Either a still-photo URL ending in .jpg/.jpeg/.png (e.g. https://assets1.webcam.io/w/<ID>/latest.jpg,
+    shown as the latest photo) or a YouTube embed (shown as live video).
+    Taken from the CAMERA_EMBED environment variable, else from camara.txt next to this script.
+    Best value: https://www.youtube.com/embed/live_stream?channel=<CHANNEL_ID>
+    (always shows whatever the channel is streaming now, so it survives stream restarts)."""
+    url = os.environ.get('CAMERA_EMBED', '').strip()
+    if not url:
+        try:
+            with open(os.path.join(HERE, 'camara.txt'), encoding='utf-8') as f:
+                url = next((ln.strip() for ln in f if ln.strip() and not ln.startswith('#')), '')
+        except FileNotFoundError:
+            pass
+    return url if url.startswith('https://') else ''
+
+
 def build(src, dest, snapshot=False):
     day, ag_p, ds_p = newest_pair(src)
     ag, ds = parse(ag_p), parse(ds_p)
@@ -61,6 +78,7 @@ def build(src, dest, snapshot=False):
         'built': dt.datetime.now().strftime('%Y-%m-%d %H:%M'),
         'sol': sol, 'inj': inj, 'grd': grd,
         'snapshot': snapshot,
+        'cam': camera_url(),
     }
     html = TEMPLATE.replace('/*DATA*/null', json.dumps(data, separators=(',', ':')))
     if snapshot:   # page body only (the publisher adds its own document skeleton)
@@ -145,6 +163,23 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .tip b{display:block;margin-bottom:3px}
 .tip div{display:flex;align-items:center;gap:6px}
 .tip div span:last-child{margin-left:auto;padding-left:12px}
+.cam{margin:12px 0}
+.cam button.open{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;text-align:left}
+.cam button.open:hover{border-color:var(--axis)}
+.cam button.open:focus-visible,.cam button.close:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
+.cam button.open[disabled]{cursor:default;color:var(--ink3);font-weight:500}
+.cam .play{width:26px;height:26px;border-radius:50%;background:var(--grid-in);color:#fff;display:grid;place-items:center;
+  font-size:11px;flex:none}
+.cam button[disabled] .play{background:var(--axis)}
+.cam .sub2{margin-left:auto;font-weight:400;font-size:12px;color:var(--ink2)}
+.cam .box{margin-top:8px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:8px}
+.cam .ratio{position:relative;width:100%;aspect-ratio:16/9;max-width:100%;background:#000;border-radius:8px;overflow:hidden}
+.cam iframe,.cam img{position:absolute;inset:0;width:100%;height:100%;border:0}
+.cam img{object-fit:contain}
+.cam .msg{position:absolute;inset:0;display:grid;place-items:center;color:#ccc;font-size:13px;padding:12px;text-align:center}
+.cam .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--ink2)}
+.cam button.close{border:1px solid var(--rule);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
 details{margin:12px 0}
 summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 2px}
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
@@ -168,6 +203,19 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     <p class="note">kWh por intervalo de 15 minutos. Barras sobre la línea: lo que consumió el sitio. Debajo de la línea: energía solar inyectada a la red.</p>
     <div class="legend" id="legend1"></div>
     <div class="chart" id="c15"></div>
+  </section>
+
+  <section class="cam" id="cam" aria-label="Cámara de la planta">
+    <button class="open" id="camBtn" type="button" aria-expanded="false" aria-controls="camBox">
+      <span class="play" aria-hidden="true">&#9654;</span>
+      <span id="camLabel">Ver cámara en vivo</span>
+      <span class="sub2" id="camSub">Planta Agritur</span>
+    </button>
+    <div class="box" id="camBox" hidden>
+      <div class="ratio" id="camRatio"></div>
+      <div class="row"><span id="camNote">Video en vivo vía YouTube (sin sonido).</span>
+        <button class="close" id="camClose" type="button">&#10005; Cerrar</button></div>
+    </div>
   </section>
 
   <section class="card">
@@ -345,6 +393,54 @@ function draw(){
   chart('c60', H, 24, 3, i => hhmm(i*60), i => hhmm(i*60)+'–'+hhmm(i*60+60));
 }
 draw();
+
+// ---- live camera (loads only when opened) ----
+(function(){
+  const btn = document.getElementById('camBtn'), box = document.getElementById('camBox'),
+        ratio = document.getElementById('camRatio');
+  if (!D.cam) {
+    btn.disabled = true;
+    document.getElementById('camLabel').textContent = 'Cámara en vivo: próximamente';
+    return;
+  }
+  const photo = /\.(jpe?g|png)(\?.*)?$/i.test(D.cam);
+  const idle = photo ? 'Ver foto de la cámara' : 'Ver cámara en vivo';
+  document.getElementById('camLabel').textContent = idle;
+  if (photo) {
+    document.getElementById('camSub').textContent = 'Planta Agritur · cada 15 min';
+    document.getElementById('camNote').textContent = 'Última foto de la cámara (se actualiza cada 15 minutos).';
+  }
+  let timer = null;
+  const loadPhoto = () => {
+    const sep = D.cam.includes('?') ? '&' : '?';
+    const img = new Image();
+    img.alt = 'Última foto de la cámara de la planta';
+    img.onload = () => { ratio.innerHTML = ''; ratio.appendChild(img); };
+    img.onerror = () => { if (!ratio.querySelector('img'))
+      ratio.innerHTML = '<div class="msg">La foto todavía no está disponible. Probá de nuevo en unos minutos.</div>'; };
+    img.src = D.cam + sep + 't=' + Date.now();     // skip any cached copy
+  };
+  const open = () => {
+    if (photo) {
+      ratio.innerHTML = '<div class="msg">Cargando foto…</div>';
+      loadPhoto(); timer = setInterval(loadPhoto, 60000);
+    } else {
+      const sep = D.cam.includes('?') ? '&' : '?';
+      ratio.innerHTML = '<iframe src="' + D.cam + sep + 'autoplay=1&mute=1&playsinline=1&rel=0" title="Cámara de la planta en vivo" ' +
+        'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    }
+    box.hidden = false; btn.setAttribute('aria-expanded','true');
+    document.getElementById('camLabel').textContent = photo ? 'Foto de la cámara (abierta)' : 'Cámara en vivo (abierta)';
+  };
+  const close = () => {
+    clearInterval(timer); timer = null;
+    ratio.innerHTML = '';                       // stops the video and its data use
+    box.hidden = true; btn.setAttribute('aria-expanded','false');
+    document.getElementById('camLabel').textContent = idle;
+  };
+  btn.addEventListener('click', () => box.hidden ? open() : close());
+  document.getElementById('camClose').addEventListener('click', () => { close(); btn.focus(); });
+})();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
 
