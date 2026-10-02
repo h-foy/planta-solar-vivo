@@ -76,7 +76,9 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .cam .sub2{margin-left:auto;font-weight:400;font-size:12px;color:var(--ink2)}
 .cam .box{margin-top:8px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:8px}
 .cam .ratio{position:relative;width:100%;aspect-ratio:16/9;max-width:100%;background:#000;border-radius:8px;overflow:hidden}
-.cam iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.cam iframe,.cam img{position:absolute;inset:0;width:100%;height:100%;border:0}
+.cam img{object-fit:contain}
+.cam .msg{position:absolute;inset:0;display:grid;place-items:center;color:#ccc;font-size:13px;padding:12px;text-align:center}
 .cam .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--ink2)}
 .cam button.close{border:1px solid var(--rule);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
 details{margin:12px 0}
@@ -112,7 +114,7 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     </button>
     <div class="box" id="camBox" hidden>
       <div class="ratio" id="camRatio"></div>
-      <div class="row"><span>Video en vivo vía YouTube (sin sonido).</span>
+      <div class="row"><span id="camNote">Video en vivo vía YouTube (sin sonido).</span>
         <button class="close" id="camClose" type="button">&#10005; Cerrar</button></div>
     </div>
   </section>
@@ -135,7 +137,7 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
 </main>
 
 <script>
-const D = {"date":"2026-10-02","n":29,"last":"07:15","built":"2026-10-02 07:17","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.077],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[103.885,103.834,103.578,103.987,103.578,103.373,103.578,103.322,103.373,103.629,103.885,103.373,103.475,103.424,103.885,103.629,104.243,104.294,117.965,136.448,112.998,103.475,103.578,104.038,103.475,103.475,104.141,92.57,92.211],"snapshot":false,"cam":""};
+const D = {"date":"2026-10-02","n":30,"last":"07:30","built":"2026-10-02 07:32","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.077,0.23],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[103.885,103.834,103.578,103.987,103.578,103.373,103.578,103.322,103.373,103.629,103.885,103.373,103.475,103.424,103.885,103.629,104.243,104.294,117.965,136.448,112.998,103.475,103.578,104.038,103.475,103.475,104.141,92.57,92.211,104.448],"snapshot":false,"cam":"https://assets1.webcam.io/w/PVeW49/latest.jpg"};
 const S = [
   {key:'onsite', name:'Solar consumida en sitio', css:'--onsite'},
   {key:'grd',    name:'Comprada a la red',   css:'--grid-in'},
@@ -302,17 +304,40 @@ draw();
     document.getElementById('camLabel').textContent = 'Cámara en vivo: próximamente';
     return;
   }
-  const open = () => {
+  const photo = /\.(jpe?g|png)(\?.*)?$/i.test(D.cam);
+  const idle = photo ? 'Ver foto de la cámara' : 'Ver cámara en vivo';
+  document.getElementById('camLabel').textContent = idle;
+  if (photo) {
+    document.getElementById('camSub').textContent = 'Planta Agritur · cada 15 min';
+    document.getElementById('camNote').textContent = 'Última foto de la cámara (se actualiza cada 15 minutos).';
+  }
+  let timer = null;
+  const loadPhoto = () => {
     const sep = D.cam.includes('?') ? '&' : '?';
-    ratio.innerHTML = '<iframe src="' + D.cam + sep + 'autoplay=1&mute=1&playsinline=1&rel=0" title="Cámara de la planta en vivo" ' +
-      'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    const img = new Image();
+    img.alt = 'Última foto de la cámara de la planta';
+    img.onload = () => { ratio.innerHTML = ''; ratio.appendChild(img); };
+    img.onerror = () => { if (!ratio.querySelector('img'))
+      ratio.innerHTML = '<div class="msg">La foto todavía no está disponible. Probá de nuevo en unos minutos.</div>'; };
+    img.src = D.cam + sep + 't=' + Date.now();     // skip any cached copy
+  };
+  const open = () => {
+    if (photo) {
+      ratio.innerHTML = '<div class="msg">Cargando foto…</div>';
+      loadPhoto(); timer = setInterval(loadPhoto, 60000);
+    } else {
+      const sep = D.cam.includes('?') ? '&' : '?';
+      ratio.innerHTML = '<iframe src="' + D.cam + sep + 'autoplay=1&mute=1&playsinline=1&rel=0" title="Cámara de la planta en vivo" ' +
+        'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    }
     box.hidden = false; btn.setAttribute('aria-expanded','true');
-    document.getElementById('camLabel').textContent = 'Cámara en vivo (abierta)';
+    document.getElementById('camLabel').textContent = photo ? 'Foto de la cámara (abierta)' : 'Cámara en vivo (abierta)';
   };
   const close = () => {
+    clearInterval(timer); timer = null;
     ratio.innerHTML = '';                       // stops the video and its data use
     box.hidden = true; btn.setAttribute('aria-expanded','false');
-    document.getElementById('camLabel').textContent = 'Ver cámara en vivo';
+    document.getElementById('camLabel').textContent = idle;
   };
   btn.addEventListener('click', () => box.hidden ? open() : close());
   document.getElementById('camClose').addEventListener('click', () => { close(); btn.focus(); });
