@@ -81,6 +81,16 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .cam .msg{position:absolute;inset:0;display:grid;place-items:center;color:#ccc;font-size:13px;padding:12px;text-align:center}
 .cam .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--ink2)}
 .cam button.close{border:1px solid var(--rule);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 2px}
+.hd h2{margin:0}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:9px;padding:2px;background:var(--bg)}
+.seg button{border:0;background:transparent;color:var(--ink2);font:inherit;font-size:13px;padding:5px 11px;border-radius:7px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg button:focus-visible{outline:2px solid var(--inject);outline-offset:1px}
+.seg button[disabled]{opacity:.45;cursor:default}
+.days{margin:10px 2px 4px}
+.days table{font-size:12px}
+.days td.today{font-weight:600}
 details{margin:12px 0}
 summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 2px}
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
@@ -119,11 +129,18 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     </div>
   </section>
 
-  <section class="card">
-    <h2>Por hora</h2>
-    <p class="note">Solo horas completas (la hora 13:00 = de 13:00 a 14:00).</p>
+  <section class="card" id="hourCard">
+    <div class="hd">
+      <h2 id="h60">Por hora</h2>
+      <div class="seg" role="group" aria-label="Período del gráfico por hora">
+        <button type="button" id="segDay" aria-pressed="true">Hoy</button>
+        <button type="button" id="seg5" aria-pressed="false">5 días</button>
+      </div>
+    </div>
+    <p class="note" id="n60">Solo horas completas (la hora 13:00 = de 13:00 a 14:00).</p>
     <div class="legend" id="legend2"></div>
     <div class="chart" id="c60"></div>
+    <div class="days" id="days5" hidden></div>
   </section>
 
   <section class="tiles" id="tiles" aria-label="Hoy hasta ahora"></section>
@@ -137,7 +154,7 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
 </main>
 
 <script>
-const D = {"date":"2026-10-02","n":39,"last":"09:45","built":"2026-10-02 09:45","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.077,0.23,1.587,2.061,4.762,6.707,5.184,5.85,8.512,9.843,12.557],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[103.885,103.834,103.578,103.987,103.578,103.373,103.578,103.322,103.373,103.629,103.885,103.373,103.475,103.424,103.885,103.629,104.243,104.294,117.965,136.448,112.998,103.475,103.578,104.038,103.475,103.475,104.141,92.57,92.211,104.448,102.4,101.632,99.533,68.454,78.387,97.024,90.01,61.85,72.858],"snapshot":false,"cam":"https://assets1.webcam.io/w/PVeW49/latest.jpg"};
+const D = {"date":"2026-10-02","n":40,"last":"10:00","built":"2026-10-02 10:00","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.077,0.23,1.587,2.061,4.762,6.707,5.184,5.85,8.512,9.843,12.557,14.208],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[103.885,103.834,103.578,103.987,103.578,103.373,103.578,103.322,103.373,103.629,103.885,103.373,103.475,103.424,103.885,103.629,104.243,104.294,117.965,136.448,112.998,103.475,103.578,104.038,103.475,103.475,104.141,92.57,92.211,104.448,102.4,101.632,99.533,68.454,78.387,97.024,90.01,61.85,72.858,90.061],"snapshot":false,"cam":"https://assets1.webcam.io/w/PVeW49/latest.jpg","hist":[{"date":"2026-10-01","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,13.991,144.794,283.034,392.832,445.799,452.48,449.498,436.685,250.522,251.29,203.904,61.76,1.369,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.024,17.46,140.799,154.521,142.438,4.352,1.536,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[413.85,414.361,413.593,414.157,413.747,414.26,295.885,264.755,260.813,134.708,33.23,3.277,0.461,0.0,0.973,138.035,214.068,222.822,366.183,423.987,425.934,425.882,425.575,419.174]}]};
 const S = [
   {key:'onsite', name:'Solar consumida en sitio', css:'--onsite'},
   {key:'grd',    name:'Comprada a la red',   css:'--grid-in'},
@@ -213,7 +230,8 @@ function niceStep(range, target){
   const raw = range/target, p = Math.pow(10, Math.floor(Math.log10(raw)));
   const m = raw/p; return (m<=1?1:m<=2?2:m<=2.5?2.5:m<=5?5:10)*p;
 }
-function chart(el, d, slots, labelEvery, labelFn, tipLabel){
+function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
+  opt = opt || {};
   const box0 = document.getElementById(el);
   const W = Math.max(300, Math.round(box0.clientWidth || 340));
   const Hh = Math.round(Math.min(320, Math.max(210, W*0.58))), pl = 34, pr = 6, pt = 10, pb = 24;
@@ -232,8 +250,15 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel){
     s += '<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+yy+'" y2="'+yy+'" stroke="'+(Math.abs(v)<1e-9?col('--axis'):col('--grid'))+'" stroke-width="1"/>';
     s += '<text x="'+(pl-6)+'" y="'+(yy+4)+'" text-anchor="end" font-size="11" fill="'+col('--ink3')+'">'+fmt(Math.abs(v),0)+'</text>';
   }
-  for (let i=0;i<slots;i+=labelEvery){
-    s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+labelFn(i)+'</text>';
+  if (opt.ticks){
+    for (const [i,txt] of opt.ticks)
+      s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+txt+'</text>';
+    for (const i of (opt.seps||[]))
+      s += '<line x1="'+(pl+i*bw)+'" x2="'+(pl+i*bw)+'" y1="'+pt+'" y2="'+(pt+ih)+'" stroke="'+col('--axis')+'" stroke-width="1" stroke-dasharray="2 3"/>';
+  } else {
+    for (let i=0;i<slots;i+=labelEvery){
+      s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+labelFn(i)+'</text>';
+    }
   }
   const y0 = y(0);
   // rounded-end bar path: rounded at the far end only, anchored to the baseline
@@ -256,9 +281,14 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel){
     if (j>0) s += bar(x, y0, y(-j), cI, false);
   }
   // solar line
-  let p = '', pts = [];
-  for (let i=0;i<slots;i++){ if (d.sol[i]==null) break; pts.push([pl+i*bw+bw/2, y(d.sol[i])]); }
-  if (pts.length){ p = 'M'+pts.map(t=>t[0].toFixed(1)+','+t[1].toFixed(1)).join('L');
+  let p = '', pts = [], segs = [];
+  for (let i=0;i<slots;i++){
+    if (d.sol[i]==null){ if (pts.length) segs.push(pts); pts = []; continue; }
+    pts.push([pl+i*bw+bw/2, y(d.sol[i])]);
+  }
+  if (pts.length) segs.push(pts);
+  pts = segs.length ? segs[segs.length-1] : [];
+  if (pts.length){ p = segs.map(sg => 'M'+sg.map(t=>t[0].toFixed(1)+','+t[1].toFixed(1)).join('L')).join('');
     s += '<path d="'+p+'" fill="none" stroke="'+cCard+'" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>';
     s += '<path d="'+p+'" fill="none" stroke="'+cS+'" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>';
     const lp = pts[pts.length-1];
@@ -289,9 +319,59 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel){
   svg.addEventListener('touchstart', show, {passive:true}); svg.addEventListener('touchmove', show, {passive:true});
   document.addEventListener('touchstart', e => { if (!box.contains(e.target)) hide(); }, {passive:true});
 }
+// ---- 5-day view: previous days (hourly) + today's complete hours ----
+const dname = iso => { const t = new Date(iso+'T12:00:00');
+  return t.toLocaleDateString('es-AR',{weekday:'short'}).replace('.','')+' '+t.getDate(); };
+const F = (function(){
+  const hist = D.hist || [];
+  if (!hist.length) return null;
+  const f = {sol:[],inj:[],grd:[],onsite:[],ticks:[],seps:[],lab:[]};
+  const add = (iso, sol, inj, grd) => {
+    const base = f.sol.length;
+    if (base) f.seps.push(base);
+    f.ticks.push([base+12, dname(iso)]);
+    for (let h=0;h<24;h++){
+      const s0 = sol[h], j = inj[h], g = grd[h];
+      f.sol.push(s0); f.inj.push(j); f.grd.push(g);
+      f.onsite.push(s0==null ? null : Math.max(0, s0-j));
+      f.lab.push([iso,h]);
+    }
+  };
+  for (const d of hist) add(d.date, d.sol, d.inj, d.grd);
+  add(D.date, H.sol, H.inj, H.grd);
+  f.tip = i => { const [iso,h] = f.lab[i]; const t = new Date(iso+'T12:00:00');
+    return t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'numeric'}).replace('.','')+' · '+hhmm(h*60)+'–'+hhmm(h*60+60); };
+  // per-day totals
+  const tot = a => a.reduce((t,x)=>t+(x||0),0);
+  const rows = hist.map(d => [d.date, tot(d.sol), tot(d.grd), tot(d.inj), false]);
+  rows.push([D.date, T.sol, T.grd, T.inj, true]);
+  let tb = '<table><thead><tr><th>Día</th><th>Solar</th><th>Comprada a la red</th><th>Inyectada</th></tr></thead><tbody>';
+  for (const [iso,a,b,c,today] of rows)
+    tb += '<tr><td'+(today?' class="today"':'')+'>'+dname(iso)+(today?' (hasta '+D.last+')':'')+'</td><td>'+fmt(a,0)+'</td><td>'+fmt(b,0)+'</td><td>'+fmt(c,0)+'</td></tr>';
+  document.getElementById('days5').innerHTML = tb + '</tbody></table>';
+  return f;
+})();
+let mode5 = false;
+try { mode5 = localStorage.getItem('vista60') === '5d'; } catch(e) {}
+function setMode(five){
+  mode5 = !!(five && F);
+  document.getElementById('segDay').setAttribute('aria-pressed', String(!mode5));
+  document.getElementById('seg5').setAttribute('aria-pressed', String(mode5));
+    document.getElementById('n60').textContent = mode5
+    ? 'Últimos 5 días: los 4 días anteriores y hoy hasta la última hora completa. Totales por día (kWh) debajo del gráfico.'
+    : 'Solo horas completas (la hora 13:00 = de 13:00 a 14:00).';
+  document.getElementById('days5').hidden = !mode5;
+  try { localStorage.setItem('vista60', mode5 ? '5d' : 'hoy'); } catch(e) {}
+}
+if (!F){ const b = document.getElementById('seg5'); b.disabled = true; b.title = 'Todavía no hay días anteriores guardados'; }
+document.getElementById('segDay').addEventListener('click', () => { setMode(false); draw(); });
+document.getElementById('seg5').addEventListener('click', () => { setMode(true); draw(); });
+setMode(mode5);
+
 function draw(){
   chart('c15', q, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15));
-  chart('c60', H, 24, 3, i => hhmm(i*60), i => hhmm(i*60)+'–'+hhmm(i*60+60));
+  if (mode5 && F) chart('c60', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps});
+  else chart('c60', H, 24, 3, i => hhmm(i*60), i => hhmm(i*60)+'–'+hhmm(i*60+60));
 }
 draw();
 
