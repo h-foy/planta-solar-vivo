@@ -7,7 +7,7 @@ Secrets provided by the workflow (never stored in this public repository):
 
 Writes (and the workflow then commits):
   nube/index.html                    the phone page   -> https://h-foy.github.io/planta-solar-vivo/nube/
-  data/YYYY/<METER>_YYYYMMDD.PRN     each finished day, as an off-site archive
+  data/YYYY/<METER>_YYYYMMDD.PRN     each finished day: off-site archive and the page's 5-day chart
 """
 import datetime as dt
 import json
@@ -51,7 +51,10 @@ def page_state():
 
 
 def archived(day):
-    return all(os.path.exists(os.path.join(DATA, f'{day:%Y}', f'{m}_{day:%Y%m%d}.PRN')) for m in METERS)
+    folder = os.path.join(DATA, f'{day:%Y}')
+    if os.path.exists(os.path.join(folder, f'{day:%Y%m%d}_incompleto.txt')):
+        return True                                       # tried before; the meters don't have the whole day
+    return all(os.path.exists(os.path.join(folder, f'{m}_{day:%Y%m%d}.PRN')) for m in METERS)
 
 
 def main():
@@ -68,24 +71,35 @@ def main():
     due = now.replace(second=0, microsecond=0) - dt.timedelta(minutes=now.minute % 15)
     due_txt = '24:00' if due.time() == dt.time(0, 0) else due.strftime('%H:%M')
     pdate, plast = page_state()
-    need_yday = now.hour < 2 and not archived(yday)      # archive attempts only 00:00-01:59
+    # the 4 finished days before today are kept in data/ (for the 5-day chart and as an archive);
+    # a missing one (yesterday first) is read from the meters, at most one per run
+    missing = [d for d in (today - dt.timedelta(days=k) for k in range(1, 5)) if not archived(d)]
+    need_yday = bool(missing)
     page_current = (pdate == today.isoformat() and plast is not None and plast >= due.strftime('%H:%M')) or \
                    (due.time() == dt.time(0, 0) and pdate == yday.isoformat() and plast == '24:00')
     if page_current and not need_yday:
         say(f'Nothing new: page already has {pdate} {plast} (due {due_txt}).')
         return
-    say(f'Cycle: page has {pdate} {plast}, due {due_txt}, archive yesterday: {need_yday}')
+    say(f'Cycle: page has {pdate} {plast}, due {due_txt}, days still to archive: '
+        f'{", ".join(d.isoformat() for d in missing) or "none"}')
 
-    if need_yday:
-        if step('read yesterday', ['sl7000_prn.py', '--date', yday.isoformat(), '--outdir', OUT]):
-            os.makedirs(os.path.join(DATA, f'{yday:%Y}'), exist_ok=True)
+    if missing:
+        day = missing[0]
+        if step(f'read {day}', ['sl7000_prn.py', '--date', day.isoformat(), '--outdir', OUT]):
+            os.makedirs(os.path.join(DATA, f'{day:%Y}'), exist_ok=True)
             for m in METERS:
-                src = os.path.join(OUT, f'{m}_{yday:%Y%m%d}.PRN')
-                if os.path.exists(src):
-                    shutil.copy2(src, os.path.join(DATA, f'{yday:%Y}', os.path.basename(src)))
+                src = os.path.join(OUT, f'{m}_{day:%Y%m%d}.PRN')
+                if os.path.exists(src):           # only complete days get a file without _hasta_
+                    shutil.copy2(src, os.path.join(DATA, f'{day:%Y}', os.path.basename(src)))
+            # yesterday's last reading can lag a little after midnight: keep trying it until 02:00;
+            # any other day that still comes back incomplete is noted so it is not read again every run
+            if not archived(day) and (day < yday or now.hour >= 2):
+                with open(os.path.join(DATA, f'{day:%Y}', f'{day:%Y%m%d}_incompleto.txt'), 'w') as f:
+                    f.write('Los medidores no devolvieron el día completo; se omite del gráfico de 5 días.\n')
+                say(f'{day}: incomplete in the meters, noted and skipped from now on')
     if not (due.time() == dt.time(0, 0)):
         step('read today', ['sl7000_prn.py', '--date', 'today', '--outdir', OUT])
-    if step('build page', ['make_live_page.py', OUT, PAGE_DIR], 120):
+    if step('build page', ['make_live_page.py', OUT, PAGE_DIR, '--history', DATA], 120):
         say(f'Page state now: {page_state()}')
 
 
