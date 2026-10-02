@@ -1,0 +1,373 @@
+"""Build the live phone page (index.html) from the newest MeterReader PRN pair.
+
+    python make_live_page.py <PRN folder> <output folder>
+
+Reads the newest date that has both meters (AGRIM02P = solar, DAGSR01P = grid connection),
+preferring the latest partial "_hasta_HHMM" file, and writes a single self-contained
+index.html: no external files, works offline, refreshes itself in the browser.
+
+Definitions (same as the hourly Excel report):
+  solar     = AGRIM02P column 1 (export)          kWh per 15 min
+  injected  = DAGSR01P column 1 (export to grid)
+  grid      = DAGSR01P column 2 (import from grid)
+  on-site   = solar - injected   (solar used behind the meter)
+  total use = on-site + grid
+"""
+import datetime as dt
+import glob
+import json
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from parse import parse  # noqa: E402
+
+PAT = re.compile(r'(AGRIM02P|DAGSR01P)_(\d{8})(?:_hasta_(\d{4}))?\.PRN$', re.I)
+
+
+def newest_pair(src):
+    found = {}
+    for p in glob.glob(os.path.join(src, '*.PRN')):
+        m = PAT.search(os.path.basename(p))
+        if not m:
+            continue
+        meter, day, hasta = m.group(1).upper(), m.group(2), m.group(3)
+        rank = int(hasta) if hasta else 2400            # full-day file beats any partial
+        cur = found.setdefault(day, {}).get(meter)
+        if cur is None or rank > cur[0]:
+            found[day][meter] = (rank, p)
+    days = sorted(d for d, v in found.items() if len(v) == 2)
+    if not days:
+        raise SystemExit('no date in %s has both meters' % src)
+    d = days[-1]
+    return d, found[d]['AGRIM02P'][1], found[d]['DAGSR01P'][1]
+
+
+def build(src, dest, snapshot=False):
+    day, ag_p, ds_p = newest_pair(src)
+    ag, ds = parse(ag_p), parse(ds_p)
+    n = min(len(ag), len(ds), 96)
+    r3 = lambda x: round(x, 3)
+    sol = [r3(ag[i][0]) for i in range(n)]
+    inj = [r3(ds[i][0]) for i in range(n)]
+    grd = [r3(ds[i][1]) for i in range(n)]
+    last = dt.datetime.strptime(day, '%Y%m%d') + dt.timedelta(minutes=15 * n)
+    data = {
+        'date': f'{day[:4]}-{day[4:6]}-{day[6:]}',
+        'n': n,
+        'last': '24:00' if n == 96 else last.strftime('%H:%M'),
+        'built': dt.datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'sol': sol, 'inj': inj, 'grd': grd,
+        'snapshot': snapshot,
+    }
+    html = TEMPLATE.replace('/*DATA*/null', json.dumps(data, separators=(',', ':')))
+    if snapshot:   # page body only (the publisher adds its own document skeleton)
+        for tag in ('<!doctype html>', '<html lang="es-AR">', '<head>', '</head>', '<body>', '</body>', '</html>',
+                    '<meta charset="utf-8">',
+                    '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'):
+            html = html.replace(tag, '')
+        html = html.strip() + '\n'
+    os.makedirs(dest, exist_ok=True)
+    out = os.path.join(dest, 'index.html')
+    tmp = out + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        f.write(html)
+    os.replace(tmp, out)
+    print(f'{data["date"]}  {n}/96 intervals, up to {data["last"]}  ->  {out}')
+    return out
+
+
+TEMPLATE = r'''<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Planta Solar en Vivo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23F39C12'/%3E%3Cg stroke='%23F39C12' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M16 2v4M16 26v4M2 16h4M26 16h4M6 6l3 3M23 23l3 3M6 26l3-3M23 9l3-3'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f3ef; --card:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --ink3:#7a7974;
+  --rule:#e4e2dc; --grid:#ecebe6; --axis:#b9b7b0;
+  --solar:#F39C12; --onsite:#2ECC71; --grid-in:#E74C3C; --inject:#2980B9;
+  --warn-bg:#fff4e0; --warn-ink:#7a4a00;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121211; --card:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --ink3:#8f8e86;
+    --rule:#2c2c2a; --grid:#262624; --axis:#4a4945;
+    --solar:#F5A623; --onsite:#34D17A; --grid-in:#EE5A4C; --inject:#3D93CC;
+    --warn-bg:#3a2a0c; --warn-ink:#ffd58a;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121211; --card:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --ink3:#8f8e86;
+  --rule:#2c2c2a; --grid:#262624; --axis:#4a4945;
+  --solar:#F5A623; --onsite:#34D17A; --grid-in:#EE5A4C; --inject:#3D93CC;
+  --warn-bg:#3a2a0c; --warn-ink:#ffd58a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%}
+body{min-height:100vh}
+main{max-width:760px;margin:0 auto;padding:16px 16px 40px}
+header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
+.sub{color:var(--ink2);font-size:14px}
+.sub b{color:var(--ink);font-weight:600}
+.stale{display:none;margin:12px 0 0;padding:10px 12px;border-radius:10px;background:var(--warn-bg);
+  color:var(--warn-ink);font-size:14px;gap:8px;align-items:flex-start}
+.stale.on{display:flex}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0}
+@media (min-width:560px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:12px}
+.tile .k{font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:6px}
+.tile .v{font-size:22px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:13px;font-weight:500;color:var(--ink2);margin-left:3px}
+.tile .d{font-size:12px;color:var(--ink3);margin-top:2px}
+.sw{width:10px;height:10px;border-radius:3px;flex:none}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:14px 12px 10px;margin:12px 0}
+.card h2{font-size:15px;margin:0 2px 2px}
+.card .note{font-size:12px;color:var(--ink2);margin:0 2px 8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink2);margin:2px 2px 8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend .ln{width:14px;height:3px;border-radius:2px;background:var(--solar)}
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--card);color:var(--ink);border:1px solid var(--rule);
+  border-radius:10px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.14);
+  white-space:nowrap;display:none;z-index:2;font-variant-numeric:tabular-nums}
+.tip b{display:block;margin-bottom:3px}
+.tip div{display:flex;align-items:center;gap:6px}
+.tip div span:last-child{margin-left:auto;padding-left:12px}
+details{margin:12px 0}
+summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 2px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--rule)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ink2);font-weight:600;font-size:12px}
+tfoot td{font-weight:650}
+footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Planta solar &middot; energía en vivo</h1>
+    <div class="sub" id="sub"></div>
+    <div class="stale" id="stale" role="status"><span aria-hidden="true">&#9888;</span><span id="staleText"></span></div>
+  </header>
+
+  <section class="card">
+    <h2>Cada 15 minutos</h2>
+    <p class="note">kWh por intervalo de 15 minutos. Barras sobre la línea: lo que consumió el sitio. Debajo de la línea: energía solar inyectada a la red.</p>
+    <div class="legend" id="legend1"></div>
+    <div class="chart" id="c15"></div>
+  </section>
+
+  <section class="card">
+    <h2>Por hora</h2>
+    <p class="note">Solo horas completas (la hora 13:00 = de 13:00 a 14:00).</p>
+    <div class="legend" id="legend2"></div>
+    <div class="chart" id="c60"></div>
+  </section>
+
+  <section class="tiles" id="tiles" aria-label="Hoy hasta ahora"></section>
+
+  <details>
+    <summary>Tabla por hora</summary>
+    <table id="tbl"></table>
+  </details>
+
+  <footer id="foot"></footer>
+</main>
+
+<script>
+const D = /*DATA*/null;
+const S = [
+  {key:'onsite', name:'Solar consumida en sitio', css:'--onsite'},
+  {key:'grd',    name:'Comprada a la red',   css:'--grid-in'},
+  {key:'inj',    name:'Inyectada a la red',  css:'--inject'},
+  {key:'sol',    name:'Producción solar',    css:'--solar', line:true},
+];
+const col = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (x,d=1) => x==null ? '–' : x.toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const hhmm = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+
+// ---- derive series (null = no reading yet) ----
+const N = 96, n = D.n;
+const q = {sol:[],inj:[],grd:[],onsite:[]};
+for (let i=0;i<N;i++){
+  if (i<n){ const s=D.sol[i], j=D.inj[i], g=D.grd[i];
+    q.sol.push(s); q.inj.push(j); q.grd.push(g); q.onsite.push(Math.max(0,s-j)); }
+  else { q.sol.push(null); q.inj.push(null); q.grd.push(null); q.onsite.push(null); }
+}
+const H = {sol:[],inj:[],grd:[],onsite:[]};
+const nh = Math.floor(n/4);
+for (let h=0;h<24;h++) for (const k in H){
+  H[k].push(h<nh ? q[k].slice(h*4,h*4+4).reduce((a,b)=>a+b,0) : null);
+}
+const sum = a => a.reduce((t,x)=>t+(x||0),0);
+const T = {sol:sum(q.sol), inj:sum(q.inj), grd:sum(q.grd), onsite:sum(q.onsite)};
+T.use = T.onsite + T.grd;
+
+// ---- header ----
+const dObj = new Date(D.date+'T12:00:00');
+const dTxt = dObj.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+document.getElementById('sub').innerHTML = dTxt + ' &middot; lecturas hasta las <b>'+D.last+'</b>';
+
+// stale check against Argentina time (UTC-3, no DST)
+(function(){
+  if (D.snapshot) return;
+  const nowAR = new Date(Date.now() - 3*3600e3);
+  const todayAR = nowAR.toISOString().slice(0,10);
+  const minsNow = nowAR.getUTCHours()*60 + nowAR.getUTCMinutes();
+  const [lh,lm] = D.last.split(':').map(Number); const minsLast = lh*60+lm;
+  let msg = '';
+  if (D.date < todayAR) {
+    if (minsNow > 7*60+30) msg = 'Se muestra el '+dTxt+'. Todavía no llegaron lecturas de hoy.';
+  } else if (minsNow - minsLast > 40) {
+    msg = 'Sin lecturas nuevas desde las '+D.last+'. La computadora que lee los medidores puede estar apagada o sin conexión; la página se pondrá al día sola.';
+  }
+  if (msg){ document.getElementById('staleText').textContent = msg; document.getElementById('stale').classList.add('on'); }
+})();
+
+// ---- tiles ----
+const pct = (a,b) => b>0 ? Math.round(a/b*100)+'%' : '–';
+const lastKw = n>0 ? D.sol[n-1]*4 : 0;
+const tiles = [
+  ['Producción solar', fmt(T.sol,0)+'<small>kWh</small>', 'Ahora aprox. '+fmt(lastKw,0)+' kW', '--solar'],
+  ['Consumo total del sitio', fmt(T.use,0)+'<small>kWh</small>', 'solar consumida + comprada a la red', null],
+  ['Comprada a la red', fmt(T.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(T.grd,T.use), '--grid-in'],
+  ['Inyectada a la red', fmt(T.inj,0)+'<small>kWh</small>', pct(T.inj,T.sol)+' de la producción solar', '--inject'],
+  ['Solar consumida en sitio', fmt(T.onsite,0)+'<small>kWh</small>', 'Autoconsumo '+pct(T.onsite,T.sol), '--onsite'],
+  ['Cobertura solar', pct(T.onsite,T.use), 'del consumo cubierto por solar', null],
+];
+document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c]) =>
+  '<div class="tile"><div class="k">'+(c?'<span class="sw" style="background:var('+c+')"></span>':'')+k+
+  '</div><div class="v">'+v+'</div><div class="d">'+d+'</div></div>').join('');
+
+// ---- legends ----
+const legendHTML = S.map(s => s.line
+  ? '<span><span class="ln"></span>'+s.name+'</span>'
+  : '<span><span class="sw" style="background:var('+s.css+')"></span>'+s.name+'</span>').join('');
+document.getElementById('legend1').innerHTML = legendHTML;
+document.getElementById('legend2').innerHTML = legendHTML;
+
+// ---- chart ----
+function niceStep(range, target){
+  const raw = range/target, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const m = raw/p; return (m<=1?1:m<=2?2:m<=2.5?2.5:m<=5?5:10)*p;
+}
+function chart(el, d, slots, labelEvery, labelFn, tipLabel){
+  const box0 = document.getElementById(el);
+  const W = Math.max(300, Math.round(box0.clientWidth || 340));
+  const Hh = Math.round(Math.min(320, Math.max(210, W*0.58))), pl = 34, pr = 6, pt = 10, pb = 24;
+  const iw = W-pl-pr, ih = Hh-pt-pb;
+  let up = 0, dn = 0;
+  for (let i=0;i<slots;i++){ up = Math.max(up,(d.onsite[i]||0)+(d.grd[i]||0), d.sol[i]||0); dn = Math.max(dn, d.inj[i]||0); }
+  if (up===0) up = 1;
+  const step = niceStep(up+dn, 5);
+  const top = Math.ceil(up/step)*step, bot = dn>0 ? Math.ceil(dn/step)*step : 0;
+  const y = v => pt + (top - v)/(top+bot)*ih;
+  const bw = iw/slots, gap = Math.max(1, Math.min(2, bw*0.18)), w = Math.max(1, bw-gap);
+  const r = Math.min(4, w/2);
+  let s = '<svg viewBox="0 0 '+W+' '+Hh+'" role="img" aria-label="Gráfico de energía">';
+  for (let v=-bot; v<=top+1e-9; v+=step){
+    const yy = y(v);
+    s += '<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+yy+'" y2="'+yy+'" stroke="'+(Math.abs(v)<1e-9?col('--axis'):col('--grid'))+'" stroke-width="1"/>';
+    s += '<text x="'+(pl-6)+'" y="'+(yy+4)+'" text-anchor="end" font-size="11" fill="'+col('--ink3')+'">'+fmt(Math.abs(v),0)+'</text>';
+  }
+  for (let i=0;i<slots;i+=labelEvery){
+    s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+labelFn(i)+'</text>';
+  }
+  const y0 = y(0);
+  // rounded-end bar path: rounded at the far end only, anchored to the baseline
+  const bar = (x, y1, y2, c, roundTop) => {
+    const h = Math.abs(y2-y1); if (h < .5) return '';
+    const rr = Math.min(r, h/2);
+    if (roundTop){ const yt = Math.min(y1,y2), yb = Math.max(y1,y2);
+      return '<path fill="'+c+'" d="M'+x+','+yb+'V'+(yt+rr)+'Q'+x+','+yt+' '+(x+rr)+','+yt+'H'+(x+w-rr)+'Q'+(x+w)+','+yt+' '+(x+w)+','+(yt+rr)+'V'+yb+'Z"/>'; }
+    const yt = Math.min(y1,y2), yb = Math.max(y1,y2);
+    return '<path fill="'+c+'" d="M'+x+','+yt+'V'+(yb-rr)+'Q'+x+','+yb+' '+(x+rr)+','+yb+'H'+(x+w-rr)+'Q'+(x+w)+','+yb+' '+(x+w)+','+(yb-rr)+'V'+yt+'Z"/>';
+  };
+  const cOn = col('--onsite'), cG = col('--grid-in'), cI = col('--inject'), cS = col('--solar'), cCard = col('--card');
+  for (let i=0;i<slots;i++){
+    if (d.sol[i]==null) continue;
+    const x = pl + i*bw + gap/2;
+    const a = d.onsite[i], g = d.grd[i], j = d.inj[i];
+    const yA = y(a), yAG = y(a+g);
+    if (a>0) s += bar(x, y0, yA, cOn, g<=0.0001);
+    if (g>0) s += bar(x, a>0 ? yA-1 : y0, yAG, cG, true);   // 1px surface gap between stacked fills
+    if (j>0) s += bar(x, y0, y(-j), cI, false);
+  }
+  // solar line
+  let p = '', pts = [];
+  for (let i=0;i<slots;i++){ if (d.sol[i]==null) break; pts.push([pl+i*bw+bw/2, y(d.sol[i])]); }
+  if (pts.length){ p = 'M'+pts.map(t=>t[0].toFixed(1)+','+t[1].toFixed(1)).join('L');
+    s += '<path d="'+p+'" fill="none" stroke="'+cCard+'" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>';
+    s += '<path d="'+p+'" fill="none" stroke="'+cS+'" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>';
+    const lp = pts[pts.length-1];
+    s += '<circle cx="'+lp[0]+'" cy="'+lp[1]+'" r="4.5" fill="'+cS+'" stroke="'+cCard+'" stroke-width="2"/>';
+  }
+  s += '<line id="'+el+'x" x1="0" x2="0" y1="'+pt+'" y2="'+(pt+ih)+'" stroke="'+col('--ink3')+'" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>';
+  s += '<rect x="'+pl+'" y="0" width="'+iw+'" height="'+Hh+'" fill="transparent" id="'+el+'hit"/>';
+  s += '</svg><div class="tip" id="'+el+'tip"></div>';
+  const box = document.getElementById(el); box.innerHTML = s;
+  // hover / tap tooltip
+  const svg = box.querySelector('svg'), tip = document.getElementById(el+'tip'), xl = document.getElementById(el+'x');
+  const show = ev => {
+    const pt0 = ev.touches ? ev.touches[0] : ev; const rc = svg.getBoundingClientRect();
+    const sx = (pt0.clientX - rc.left) / rc.width * W;
+    let i = Math.floor((sx-pl)/bw); i = Math.max(0, Math.min(slots-1, i));
+    if (d.sol[i]==null){ hide(); return; }
+    const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible');
+    const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+fmt(v)+' kWh</span></div>';
+    tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
+                    row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i]);
+    tip.style.display = 'block';
+    const px = cx/W*rc.width, tw = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(rc.width - tw, px - tw/2)) + 'px';
+    tip.style.top = '-6px'; tip.style.transform = 'translateY(-100%)';
+  };
+  const hide = () => { tip.style.display='none'; xl.setAttribute('visibility','hidden'); };
+  svg.addEventListener('mousemove', show); svg.addEventListener('mouseleave', hide);
+  svg.addEventListener('touchstart', show, {passive:true}); svg.addEventListener('touchmove', show, {passive:true});
+  document.addEventListener('touchstart', e => { if (!box.contains(e.target)) hide(); }, {passive:true});
+}
+function draw(){
+  chart('c15', q, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15));
+  chart('c60', H, 24, 3, i => hhmm(i*60), i => hhmm(i*60)+'–'+hhmm(i*60+60));
+}
+draw();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
+
+// ---- hourly table ----
+let t = '<thead><tr><th>Hora</th><th>Solar</th><th>Consumida en sitio</th><th>Desde la red</th><th>A la red</th><th>Consumo total</th></tr></thead><tbody>';
+for (let h=0;h<nh;h++) t += '<tr><td>'+hhmm(h*60)+'</td><td>'+fmt(H.sol[h])+'</td><td>'+fmt(H.onsite[h])+'</td><td>'+fmt(H.grd[h])+'</td><td>'+fmt(H.inj[h])+'</td><td>'+fmt(H.onsite[h]+H.grd[h])+'</td></tr>';
+const hs = k => sum(H[k].slice(0,nh));
+t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(hs('sol'))+'</td><td>'+fmt(hs('onsite'))+'</td><td>'+fmt(hs('grd'))+'</td><td>'+fmt(hs('inj'))+'</td><td>'+fmt(hs('onsite')+hs('grd'))+'</td></tr></tfoot>';
+document.getElementById('tbl').innerHTML = t;
+
+document.getElementById('foot').innerHTML = 'Todos los valores en kWh, leídos de los medidores de la planta cada 15 minutos. '+
+  'Página generada el '+D.built+' (hora de Argentina); se actualiza sola cada 5 minutos.';
+
+if (D.snapshot) document.getElementById('foot').innerHTML = 'Todos los valores en kWh, leídos de los medidores de la planta. '+
+  '<b>Vista de prueba</b> con datos hasta las '+D.last+'. La versión definitiva se actualizará sola cada 15 minutos.';
+// refresh: reload every 5 minutes, bypassing stale copies
+if (!D.snapshot) setTimeout(() => { location.replace(location.pathname + '?t=' + Date.now()); }, 5*60*1000);
+</script>
+</body>
+</html>
+'''
+
+if __name__ == '__main__':
+    a = [x for x in sys.argv[1:] if x != '--snapshot']
+    build(a[0] if a else os.path.join(HERE, 'Output'), a[1] if len(a) > 1 else os.path.join(HERE, 'live'),
+          snapshot='--snapshot' in sys.argv)
