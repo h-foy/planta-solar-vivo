@@ -1,0 +1,46 @@
+name: Pagina en vivo
+
+on:
+  schedule:
+    - cron: '2-59/5 * * * *'     # every 5 minutes (UTC clock; the script only reads the meters when a new 15-min reading is due)
+  workflow_dispatch:              # "Run workflow" button, and the hook for an outside timer
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pagina-en-vivo
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install the DLMS library
+        run: pip install --quiet gurux-dlms==1.0.203
+
+      - name: Read meters and build page
+        env:
+          METER_SETTINGS: ${{ secrets.METER_SETTINGS }}
+          METER_IPS: ${{ secrets.METER_IPS }}
+          TZ: America/Argentina/Buenos_Aires
+        run: python cloud/run_cloud.py
+
+      - name: Publish
+        env:
+          TZ: America/Argentina/Buenos_Aires
+        run: |
+          git config user.name  "planta-solar-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for d in nube data; do [ -e "$d" ] && git add "$d"; done
+          if git diff --cached --quiet; then echo "Nothing to publish"; exit 0; fi
+          git commit -m "Datos $(date +'%Y-%m-%d %H:%M')"
+          for i in 1 2 3; do git pull --rebase --quiet && git push --quiet && exit 0; sleep 5; done
+          exit 1
