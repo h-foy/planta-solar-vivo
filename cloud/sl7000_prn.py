@@ -70,8 +70,8 @@ K_UNITS = {27, 28, 29, 30, 31, 32}
 UNIT_NAMES = {27: "W", 28: "VA", 29: "var", 30: "Wh", 31: "VAh", 32: "varh", 33: "A", 35: "V", 44: "Hz"}
 
 VERBOSE = False
-OPEN_ATTEMPTS = 6      # connection attempts per meter
-RETRY_WAIT = 30        # seconds between attempts
+OPEN_ATTEMPTS = int(os.environ.get('METER_OPEN_ATTEMPTS', 6))   # connection attempts per meter
+RETRY_WAIT = int(os.environ.get('METER_RETRY_WAIT', 30))        # seconds between attempts
 
 
 def log(msg):
