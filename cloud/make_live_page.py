@@ -332,8 +332,8 @@ document.getElementById('sub').innerHTML = dTxt + ' &middot; lecturas hasta las 
   let msg = '';
   if (D.date < todayAR) {
     if (minsNow > 7*60+30) msg = 'Se muestra el '+dTxt+'. Todavía no llegaron lecturas de hoy.';
-  } else if (minsNow - minsLast > 40) {
-    msg = 'Sin lecturas nuevas desde las '+D.last+'. La computadora que lee los medidores puede estar apagada o sin conexión; la página se pondrá al día sola.';
+  } else if (minsNow - minsLast > 50) {
+    msg = 'Sin lecturas nuevas desde las '+D.last+'. Puede haber un problema de conexión con los medidores; la página se pondrá al día sola.';
   }
   if (msg){ document.getElementById('staleText').textContent = msg; document.getElementById('stale').classList.add('on'); }
 })();
