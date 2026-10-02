@@ -58,6 +58,10 @@ def archived(day):
 
 
 def main():
+    # runs come every 5 minutes, so a busy gateway is simply tried again on the next run;
+    # keep each run's knocking short so we never tie up the meters' gateways
+    os.environ.setdefault('METER_OPEN_ATTEMPTS', '2')
+    os.environ.setdefault('METER_RETRY_WAIT', '20')
     settings = os.environ.get('METER_SETTINGS', '').strip()
     if not settings:
         raise SystemExit('Missing secret METER_SETTINGS')
