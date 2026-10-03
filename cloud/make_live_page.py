@@ -226,6 +226,14 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .tip div{display:flex;align-items:center;gap:6px}
 .tip div span:last-child{margin-left:auto;padding-left:12px}
 .cam{margin:12px 0}
+.cam .jt{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:2px 0 10px}
+.cam .jt>div{border:1px solid var(--rule);border-radius:10px;padding:8px}
+.cam .jt .k{font-size:11px;color:var(--ink2)}
+.cam .jt .v{font-size:18px;font-weight:650;font-variant-numeric:tabular-nums}
+.cam .jt .v small{font-size:12px;font-weight:500;color:var(--ink2);margin-left:2px}
+.cam .jt .d{font-size:11px;color:var(--ink3)}
+.cam .msg2{padding:30px 8px;text-align:center;color:var(--ink2);font-size:13px}
+.cam .row a{color:var(--ink2)}
 .cam button.open{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;
   border:1px solid var(--rule);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;text-align:left}
 .cam button.open:hover,.cam a.open:hover{border-color:var(--axis)}
@@ -271,12 +279,21 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     <h1>Planta solar &middot; energía en vivo</h1>
     <div class="sub" id="sub"></div>
     <div class="stale" id="stale" role="status"><span aria-hidden="true">&#9888;</span><span id="staleText"></span></div>
-      <section class="cam" id="det" aria-label="Medidor Janitza">
-    <a class="open" id="detBtn" href="http://172.16.121.30/" target="_blank" rel="noopener">
-      <span class="play" style="background:var(--inject)" aria-hidden="true">&#9881;</span>
-      <span>Janitza</span>
-      <span class="sub2">medidor de la planta · requiere VPN</span>
-    </a>
+  <section class="cam" id="det" aria-label="Producción solar total (Janitza)">
+    <button class="open" id="detBtn" type="button" aria-expanded="false" aria-controls="detBox">
+      <span class="play" style="background:var(--solar)" aria-hidden="true">&#9728;</span>
+      <span id="detLabel">Janitza</span>
+      <span class="sub2" id="detSub">producción solar total · cada 5 min</span>
+    </button>
+    <div class="box" id="detBox" hidden>
+      <div class="jt" id="jTiles"></div>
+      <div class="legend"><span><span class="sw" style="background:var(--solar);opacity:.55"></span>Potencia, kW (izq.)</span>
+        <span><span class="ln" style="background:var(--inject)"></span>Energía acumulada, kWh (der.)</span></div>
+      <div class="chart" id="cJ"><div class="msg2">Cargando datos…</div></div>
+      <div class="row"><span id="jNote"></span>
+        <button class="close" id="detClose" type="button">&#10005; Cerrar</button></div>
+      <div class="row"><a href="http://172.16.121.30/" target="_blank" rel="noopener">Abrir medidor Janitza (requiere VPN)</a></div>
+    </div>
   </section>
   </header>
 
@@ -607,6 +624,91 @@ draw();
   };
   btn.addEventListener('click', () => box.hidden ? open() : close());
   document.getElementById('camClose').addEventListener('click', () => { close(); btn.focus(); });
+})();
+
+// ---- Janitza panel: total solar production every 5 minutes (from the SMA portal, nube/sma.json) ----
+(function(){
+  const btn = document.getElementById('detBtn'), box = document.getElementById('detBox');
+  const el = document.getElementById('cJ');
+  let J = null;
+  const KEY = 'janitzaOpen';
+  const tiles = () => {
+    const nowKw = J.kw.length ? J.kw[J.kw.length-1] : null;
+    const t = (k,v,u,d) => '<div><div class="k">'+k+'</div><div class="v">'+v+'<small>'+u+'</small></div><div class="d">'+d+'</div></div>';
+    document.getElementById('jTiles').innerHTML =
+      t('Energía', fmt(J.kwh,0), 'kWh', 'desde las '+hhmm((J.min[0]||0))) +
+      t('Potencia', fmt(nowKw,0), 'kW', 'a las '+hhmm(J.min[J.min.length-1]||0)) +
+      t('Pico', fmt(J.peak_kw,0), 'kW', 'a las '+hhmm(J.peak_at||0));
+  };
+  const plot = () => {
+    if (!J || box.hidden) return;
+    if (!J.kw.length) { el.innerHTML = '<div class="msg2">Todavía no hay datos de hoy.</div>'; return; }
+    const W = Math.max(300, el.clientWidth || 600), Hh = 230, L = 40, R = 44, T = 10, B = 24;
+    const pw = W-L-R, ph = Hh-T-B;
+    // x axis: 06:00-20:00 unless data falls outside
+    const x0 = Math.min(360, J.min[0]-5), x1 = Math.max(1200, J.min[J.min.length-1]);
+    const X = m => L + (m-x0)/(x1-x0)*pw;
+    const cum = []; let c = 0; for (const v of J.kw) { c += v*J.step/60; cum.push(c); }
+    const sk = niceStep(Math.max(...J.kw, 1), 4), kmax = Math.ceil(Math.max(...J.kw, 1)/sk)*sk;
+    const se = niceStep(Math.max(c, 1), 4), emax = Math.ceil(Math.max(c, 1)/se)*se;
+    const Yk = v => T + ph - v/kmax*ph, Ye = v => T + ph - v/emax*ph;
+    const sol = col('--solar'), inj = col('--inject'), ax = col('--axis'), ink2 = col('--ink2'), rule = col('--rule');
+    let g = '';
+    for (let v=0; v<=kmax+1e-9; v+=sk) {
+      g += '<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Yk(v)+'" y2="'+Yk(v)+'" stroke="'+rule+'"/>';
+      g += '<text x="'+(L-5)+'" y="'+(Yk(v)+4)+'" text-anchor="end" font-size="10" fill="'+ink2+'">'+fmt(v,0)+'</text>';
+    }
+    for (let v=0; v<=emax+1e-9; v+=se)
+      g += '<text x="'+(L+pw+5)+'" y="'+(Ye(v)+4)+'" font-size="10" fill="'+inj+'">'+fmt(v,0)+'</text>';
+    for (let h=Math.ceil(x0/60); h*60<=x1; h++) if (h%2===0)
+      g += '<text x="'+X(h*60)+'" y="'+(Hh-6)+'" text-anchor="middle" font-size="10" fill="'+ink2+'">'+String(h).padStart(2,'0')+'</text>';
+    const pts = J.min.map((m,i) => X(m).toFixed(1)+','+Yk(J.kw[i]).toFixed(1));
+    const area = 'M'+X(J.min[0]).toFixed(1)+','+Yk(0)+' L'+pts.join(' L')+' L'+X(J.min[J.min.length-1]).toFixed(1)+','+Yk(0)+' Z';
+    g += '<path d="'+area+'" fill="'+sol+'" fill-opacity=".35" stroke="'+sol+'" stroke-width="1.5"/>';
+    g += '<polyline points="'+J.min.map((m,i) => X(m).toFixed(1)+','+Ye(cum[i]).toFixed(1)).join(' ')+'" fill="none" stroke="'+inj+'" stroke-width="2"/>';
+    g += '<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Yk(0)+'" y2="'+Yk(0)+'" stroke="'+ax+'"/>';
+    g += '<line id="jCur" y1="'+T+'" y2="'+(T+ph)+'" stroke="'+ax+'" stroke-dasharray="3 3" visibility="hidden"/>';
+    el.innerHTML = '<svg viewBox="0 0 '+W+' '+Hh+'" role="img" aria-label="Potencia y energía solar de hoy">'+g+'</svg><div class="tip" id="jTip"></div>';
+    const svg = el.querySelector('svg'), tip = document.getElementById('jTip'), cur = document.getElementById('jCur');
+    const move = ev => {
+      const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
+      const m = x0 + (px-L)/pw*(x1-x0);
+      let i = 0, best = 1e9; J.min.forEach((v,k) => { const d = Math.abs(v-m); if (d<best) { best=d; i=k; } });
+      if (best > 20) { tip.style.display='none'; cur.setAttribute('visibility','hidden'); return; }
+      cur.setAttribute('x1', X(J.min[i])); cur.setAttribute('x2', X(J.min[i])); cur.setAttribute('visibility','visible');
+      tip.innerHTML = '<b>'+hhmm(J.min[i]-J.step)+'–'+hhmm(J.min[i])+'</b><div><span>Potencia</span><span>'+fmt(J.kw[i],0)+' kW</span></div>'+
+        '<div><span>Acumulado</span><span>'+fmt(cum[i],0)+' kWh</span></div>';
+      tip.style.display = 'block';
+      const left = (X(J.min[i]) / W) * r.width;
+      tip.style.left = Math.min(Math.max(0, left - tip.offsetWidth/2), r.width - tip.offsetWidth) + 'px';
+      tip.style.top = '4px';
+    };
+    svg.addEventListener('pointermove', move); svg.addEventListener('pointerdown', move);
+    svg.addEventListener('pointerleave', () => { tip.style.display='none'; cur.setAttribute('visibility','hidden'); });
+  };
+  const load = () => fetch('sma.json?t=' + Date.now(), {cache:'no-store'}).then(r => { if (!r.ok) throw 0; return r.json(); }).then(j => {
+    // drop the zero rows before sunrise (and after sunset) so the chart starts with the production
+    let a = j.kw.findIndex(v => v > 0), z = j.kw.length - 1 - [...j.kw].reverse().findIndex(v => v > 0);
+    if (a < 0) { a = 0; z = -1; } else { a = Math.max(0, a-1); z = Math.min(j.kw.length-1, z+1); }
+    const today0 = (D.date || '').slice(0,10);
+    if (j.date === today0) z = j.kw.length - 1;            // today: keep up to the latest reading
+    j.min = j.min.slice(a, z+1); j.kw = j.kw.slice(a, z+1);
+    J = j;
+    const today = (D.date || '').slice(0,10);
+    const note = document.getElementById('jNote');
+    const ds = j.date.split('-').reverse().join('/');
+    note.textContent = 'Datos SMA/Janitza hasta las ' + hhmm(j.min[j.min.length-1]||0) + (today && j.date !== today ? ' del ' + ds : '') + ' · actualizado ' + j.updated.slice(11);
+    document.getElementById('detSub').textContent = fmt(j.kwh,0) + ' kWh ' + (today && j.date !== today ? 'el ' + ds : 'hoy') + ' · producción solar total';
+    tiles(); plot();
+  }).catch(() => { el.innerHTML = '<div class="msg2">Todavía no hay datos de la Janitza.</div>'; });
+  const open = () => { box.hidden = false; btn.setAttribute('aria-expanded','true'); try { localStorage.setItem(KEY,'1'); } catch(e) {} J ? plot() : null; load(); };
+  const close = () => { box.hidden = true; btn.setAttribute('aria-expanded','false'); try { localStorage.removeItem(KEY); } catch(e) {} };
+  btn.addEventListener('click', () => box.hidden ? open() : close());
+  document.getElementById('detClose').addEventListener('click', () => { close(); btn.focus(); });
+  addEventListener('resize', () => setTimeout(plot, 160));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', plot);
+  let was = false; try { was = localStorage.getItem(KEY) === '1'; } catch(e) {}
+  if (was) open(); else load();
 })();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
