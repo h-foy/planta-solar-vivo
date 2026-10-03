@@ -28,6 +28,8 @@ PAT = re.compile(r'(AGRIM02P|DAGSR01P)_(\d{8})(?:_hasta_(\d{4}))?\.PRN$', re.I)
 
 
 def newest_pair(src):
+    """Newest date that has the grid meter (DAGSR01P), with the best file of each meter for that date.
+    The solar meter's file may be missing or shorter when its gateway did not answer: (day, ag_path|None, ds_path)."""
     found = {}
     for p in glob.glob(os.path.join(src, '*.PRN')):
         m = PAT.search(os.path.basename(p))
@@ -38,11 +40,27 @@ def newest_pair(src):
         cur = found.setdefault(day, {}).get(meter)
         if cur is None or rank > cur[0]:
             found[day][meter] = (rank, p)
-    days = sorted(d for d, v in found.items() if len(v) == 2)
+    days = sorted(d for d, v in found.items() if 'DAGSR01P' in v)
     if not days:
-        raise SystemExit('no date in %s has both meters' % src)
+        raise SystemExit('no date in %s has the grid meter' % src)
     d = days[-1]
-    return d, found[d]['AGRIM02P'][1], found[d]['DAGSR01P'][1]
+    ag = found[d].get('AGRIM02P')
+    return d, (ag[1] if ag else None), found[d]['DAGSR01P'][1]
+
+
+def previous_solar(prev_page, date_iso):
+    """Solar values already published for this date (used when the solar meter does not answer now)."""
+    try:
+        with open(prev_page, encoding='utf-8') as f:
+            html = f.read()
+        m = re.search(r'const D = (\{.*?\});\n', html, re.S)
+        old = json.loads(m.group(1))
+        if old.get('date') == date_iso:
+            sol = old.get('sol', [])
+            return sol[:old.get('ns', old.get('n', len(sol)))]
+    except (OSError, AttributeError, ValueError):
+        pass
+    return []
 
 
 def history(dirs, today, ndays=4):
@@ -96,19 +114,27 @@ def camera_url():
     return url if url.startswith('https://') else ''
 
 
-def build(src, dest, snapshot=False, hist_dirs=()):
+def build(src, dest, snapshot=False, hist_dirs=(), prev_page=None):
     day, ag_p, ds_p = newest_pair(src)
-    ag, ds = parse(ag_p), parse(ds_p)
-    n = min(len(ag), len(ds), 96)
+    date_iso = f'{day[:4]}-{day[4:6]}-{day[6:]}'
+    ds = parse(ds_p)
+    n = min(len(ds), 96)
     r3 = lambda x: round(x, 3)
-    sol = [r3(ag[i][0]) for i in range(n)]
+    sol = [r3(r[0]) for r in parse(ag_p)][:n] if ag_p else []
+    if prev_page:                                   # keep what was already published if it is longer
+        old = previous_solar(prev_page, date_iso)[:n]
+        if len(old) > len(sol):
+            sol = old
+    ns = len(sol)                                   # intervals with solar data (can be < n)
     inj = [r3(ds[i][0]) for i in range(n)]
     grd = [r3(ds[i][1]) for i in range(n)]
-    last = dt.datetime.strptime(day, '%Y%m%d') + dt.timedelta(minutes=15 * n)
+    hhmm = lambda k: '24:00' if k == 96 else (dt.datetime.strptime(day, '%Y%m%d') + dt.timedelta(minutes=15 * k)).strftime('%H:%M')
     data = {
-        'date': f'{day[:4]}-{day[4:6]}-{day[6:]}',
+        'date': date_iso,
         'n': n,
-        'last': '24:00' if n == 96 else last.strftime('%H:%M'),
+        'ns': ns,
+        'last': hhmm(n),
+        'solLast': hhmm(ns) if ns else '',
         'built': dt.datetime.now().strftime('%Y-%m-%d %H:%M'),
         'sol': sol, 'inj': inj, 'grd': grd,
         'snapshot': snapshot,
@@ -128,7 +154,7 @@ def build(src, dest, snapshot=False, hist_dirs=()):
     with open(tmp, 'w', encoding='utf-8') as f:
         f.write(html)
     os.replace(tmp, out)
-    print(f'{data["date"]}  {n}/96 intervals, up to {data["last"]}, history days: '
+    print(f'{data["date"]}  {n}/96 intervals, up to {data["last"]} (solar up to {data["solLast"] or "none"}), history days: '
           f'{", ".join(h["date"][5:] for h in data["hist"]) or "none"}  ->  {out}')
     return out
 
@@ -301,21 +327,24 @@ const fmt = (x,d=1) => x==null ? '–' : x.toLocaleString('es-AR',{minimumFracti
 const hhmm = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 
 // ---- derive series (null = no reading yet) ----
-const N = 96, n = D.n;
+const N = 96, n = D.n, ns = (D.ns==null ? n : D.ns);   // ns: intervals that also have solar data
 const q = {sol:[],inj:[],grd:[],onsite:[]};
 for (let i=0;i<N;i++){
-  if (i<n){ const s=D.sol[i], j=D.inj[i], g=D.grd[i];
-    q.sol.push(s); q.inj.push(j); q.grd.push(g); q.onsite.push(Math.max(0,s-j)); }
-  else { q.sol.push(null); q.inj.push(null); q.grd.push(null); q.onsite.push(null); }
+  const g = i<n ? D.grd[i] : null, j = i<n ? D.inj[i] : null, s = i<ns ? D.sol[i] : null;
+  q.grd.push(g); q.inj.push(j); q.sol.push(s); q.onsite.push(s==null ? null : Math.max(0, s-j));
 }
 const H = {sol:[],inj:[],grd:[],onsite:[]};
-const nh = Math.floor(n/4);
+const nh = Math.floor(n/4), nhs = Math.floor(ns/4);
 for (let h=0;h<24;h++) for (const k in H){
-  H[k].push(h<nh ? q[k].slice(h*4,h*4+4).reduce((a,b)=>a+b,0) : null);
+  const ok = (k==='sol'||k==='onsite') ? h<nhs : h<nh;
+  H[k].push(ok ? q[k].slice(h*4,h*4+4).reduce((a,b)=>a+b,0) : null);
 }
 const sum = a => a.reduce((t,x)=>t+(x||0),0);
 const T = {sol:sum(q.sol), inj:sum(q.inj), grd:sum(q.grd), onsite:sum(q.onsite)};
 T.use = T.onsite + T.grd;
+// same sums but only over the stretch that has both meters (for honest ratios when solar data is behind)
+const W = {sol:sum(q.sol.slice(0,ns)), inj:sum(q.inj.slice(0,ns)), grd:sum(q.grd.slice(0,ns)), onsite:sum(q.onsite.slice(0,ns))};
+W.use = W.onsite + W.grd;
 
 // ---- header ----
 const dObj = new Date(D.date+'T12:00:00');
@@ -334,20 +363,25 @@ document.getElementById('sub').innerHTML = dTxt + ' &middot; lecturas hasta las 
     if (minsNow > 7*60+30) msg = 'Se muestra el '+dTxt+'. Todavía no llegaron lecturas de hoy.';
   } else if (minsNow - minsLast > 50) {
     msg = 'Sin lecturas nuevas desde las '+D.last+'. Puede haber un problema de conexión con los medidores; la página se pondrá al día sola.';
+  } else if (n - ns >= 2) {
+    msg = 'El medidor de la planta solar no responde'+(D.solLast ? ' desde las '+D.solLast : '')+
+          '. Se muestran los datos de la red al día; la parte solar se completará sola cuando vuelva la conexión.';
   }
   if (msg){ document.getElementById('staleText').textContent = msg; document.getElementById('stale').classList.add('on'); }
 })();
 
 // ---- tiles ----
 const pct = (a,b) => b>0 ? Math.round(a/b*100)+'%' : '–';
-const lastKw = n>0 ? D.sol[n-1]*4 : 0;
+const lastKw = ns>0 ? D.sol[ns-1]*4 : 0;
+const solNote = ns < n ? (ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares todavía') : null;
+const upto = ns < n ? ' (hasta las '+(D.solLast||'00:00')+')' : '';
 const tiles = [
-  ['Producción solar', fmt(T.sol,0)+'<small>kWh</small>', 'Ahora aprox. '+fmt(lastKw,0)+' kW', '--solar'],
-  ['Consumo total del sitio', fmt(T.use,0)+'<small>kWh</small>', 'solar consumida + comprada a la red', null],
-  ['Comprada a la red', fmt(T.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(T.grd,T.use), '--grid-in'],
-  ['Inyectada a la red', fmt(T.inj,0)+'<small>kWh</small>', pct(T.inj,T.sol)+' de la producción solar', '--inject'],
-  ['Solar consumida en sitio', fmt(T.onsite,0)+'<small>kWh</small>', 'Autoconsumo '+pct(T.onsite,T.sol), '--onsite'],
-  ['Cobertura solar', pct(T.onsite,T.use), 'del consumo cubierto por solar', null],
+  ['Producción solar', fmt(T.sol,0)+'<small>kWh</small>', solNote || ('Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
+  ['Consumo total del sitio', fmt(ns<n ? W.use : T.use,0)+'<small>kWh</small>', ns<n ? 'hasta las '+(D.solLast||'00:00')+' (falta el dato solar)' : 'solar consumida + comprada a la red', null],
+  ['Comprada a la red', fmt(T.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(W.grd,W.use)+upto, '--grid-in'],
+  ['Inyectada a la red', fmt(T.inj,0)+'<small>kWh</small>', pct(W.inj,W.sol)+' de la producción solar'+upto, '--inject'],
+  ['Solar consumida en sitio', fmt(T.onsite,0)+'<small>kWh</small>', solNote || ('Autoconsumo '+pct(T.onsite,T.sol)), '--onsite'],
+  ['Cobertura solar', pct(W.onsite,W.use), 'del consumo cubierto por solar'+upto, null],
 ];
 document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c]) =>
   '<div class="tile"><div class="k">'+(c?'<span class="sw" style="background:var('+c+')"></span>':'')+k+
@@ -396,6 +430,12 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     }
   }
   const y0 = y(0);
+  // shade the stretch that has grid readings but no solar readings (solar meter not answering)
+  { let a0 = -1, a1 = -1;
+    for (let i=0;i<slots;i++){ if (d.sol[i]==null && d.grd[i]!=null){ if (a0<0) a0=i; a1=i; } }
+    if (a0>=0){ const xa = pl+a0*bw, xb = pl+(a1+1)*bw;
+      s += '<rect x="'+xa+'" y="'+pt+'" width="'+(xb-xa)+'" height="'+ih+'" fill="'+col('--ink3')+'" opacity="0.10"/>';
+      if (xb-xa > 60) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" fill="'+col('--ink2')+'">sin datos solares</text>'; } }
   // rounded-end bar path: rounded at the far end only, anchored to the baseline
   const bar = (x, y1, y2, c, roundTop) => {
     const h = Math.abs(y2-y1); if (h < .5) return '';
@@ -407,9 +447,9 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
   };
   const cOn = col('--onsite'), cG = col('--grid-in'), cI = col('--inject'), cS = col('--solar'), cCard = col('--card');
   for (let i=0;i<slots;i++){
-    if (d.sol[i]==null) continue;
+    if (d.grd[i]==null && d.sol[i]==null) continue;
     const x = pl + i*bw + gap/2;
-    const a = d.onsite[i], g = d.grd[i], j = d.inj[i];
+    const a = d.onsite[i]||0, g = d.grd[i]||0, j = d.inj[i]||0;
     const yA = y(a), yAG = y(a+g);
     if (a>0) s += bar(x, y0, yA, cOn, g<=0.0001);
     if (g>0) s += bar(x, a>0 ? yA-1 : y0, yAG, cG, true);   // 1px surface gap between stacked fills
@@ -439,9 +479,9 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     const pt0 = ev.touches ? ev.touches[0] : ev; const rc = svg.getBoundingClientRect();
     const sx = (pt0.clientX - rc.left) / rc.width * W;
     let i = Math.floor((sx-pl)/bw); i = Math.max(0, Math.min(slots-1, i));
-    if (d.sol[i]==null){ hide(); return; }
+    if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible');
-    const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+fmt(v)+' kWh</span></div>';
+    const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' kWh')+'</span></div>';
     tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
                     row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i]);
     tip.style.display = 'block';
@@ -562,7 +602,7 @@ let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(dra
 
 // ---- hourly table ----
 let t = '<thead><tr><th>Hora</th><th>Solar</th><th>Consumida en sitio</th><th>Desde la red</th><th>A la red</th><th>Consumo total</th></tr></thead><tbody>';
-for (let h=0;h<nh;h++) t += '<tr><td>'+hhmm(h*60)+'</td><td>'+fmt(H.sol[h])+'</td><td>'+fmt(H.onsite[h])+'</td><td>'+fmt(H.grd[h])+'</td><td>'+fmt(H.inj[h])+'</td><td>'+fmt(H.onsite[h]+H.grd[h])+'</td></tr>';
+for (let h=0;h<nh;h++) t += '<tr><td>'+hhmm(h*60)+'</td><td>'+fmt(H.sol[h])+'</td><td>'+fmt(H.onsite[h])+'</td><td>'+fmt(H.grd[h])+'</td><td>'+fmt(H.inj[h])+'</td><td>'+(H.onsite[h]==null ? '–' : fmt(H.onsite[h]+H.grd[h]))+'</td></tr>';
 const hs = k => sum(H[k].slice(0,nh));
 t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(hs('sol'))+'</td><td>'+fmt(hs('onsite'))+'</td><td>'+fmt(hs('grd'))+'</td><td>'+fmt(hs('inj'))+'</td><td>'+fmt(hs('onsite')+hs('grd'))+'</td></tr></tfoot>';
 document.getElementById('tbl').innerHTML = t;
@@ -587,5 +627,6 @@ if __name__ == '__main__':
             hist.append(next(it, ''))
         elif x != '--snapshot':
             args.append(x)
-    build(args[0] if args else os.path.join(HERE, 'Output'), args[1] if len(args) > 1 else os.path.join(HERE, 'live'),
-          snapshot='--snapshot' in sys.argv, hist_dirs=hist)
+    dest = args[1] if len(args) > 1 else os.path.join(HERE, 'live')
+    build(args[0] if args else os.path.join(HERE, 'Output'), dest,
+          snapshot='--snapshot' in sys.argv, hist_dirs=hist, prev_page=os.path.join(dest, 'index.html'))
