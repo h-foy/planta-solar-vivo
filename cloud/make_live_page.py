@@ -296,7 +296,7 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
   </header>
 
   <section class="card">
-    <h2>Cada 15 minutos</h2>
+    <h2>SMEC Data cada 15 minutos</h2>
     <p class="note">kWh por intervalo de 15 minutos. Barras sobre la línea: lo que consumió el sitio. Debajo de la línea: energía solar inyectada a la red.</p>
     <div class="legend" id="legend1"></div>
     <div class="chart" id="c15"></div>
