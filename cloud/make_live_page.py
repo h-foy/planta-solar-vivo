@@ -271,7 +271,7 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     <h1>Planta solar &middot; energía en vivo</h1>
     <div class="sub" id="sub"></div>
     <div class="stale" id="stale" role="status"><span aria-hidden="true">&#9888;</span><span id="staleText"></span></div>
-      <section class="cam" id="det" hidden aria-label="Detalles técnicos">
+      <section class="cam" id="det" aria-label="Medidor Janitza">
     <a class="open" id="detBtn" href="http://172.16.121.30/" target="_blank" rel="noopener">
       <span class="play" style="background:var(--inject)" aria-hidden="true">&#9881;</span>
       <span>Janitza</span>
@@ -610,18 +610,6 @@ draw();
 })();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
-
-// ---- private "Detalles" shortcut: shown only on this browser after opening the page once with ?h=1 (?h=0 hides it) ----
-(function(){
-  let on = false;
-  try {
-    const h = new URLSearchParams(location.search).get('h');
-    if (h === '1') localStorage.setItem('detallesH', '1');
-    if (h === '0') localStorage.removeItem('detallesH');
-    on = localStorage.getItem('detallesH') === '1';
-  } catch(e) { on = new URLSearchParams(location.search).get('h') === '1'; }
-  if (on) document.getElementById('det').hidden = false;
-})();
 
 // ---- hourly table ----
 let t = '<thead><tr><th>Hora</th><th>Solar</th><th>Consumida en sitio</th><th>Desde la red</th><th>A la red</th><th>Consumo total</th></tr></thead><tbody>';
