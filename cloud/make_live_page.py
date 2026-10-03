@@ -313,8 +313,8 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
 <script>
 const D = /*DATA*/null;
 const S = [
-  {key:'onsite', name:'Solar consumida en sitio', css:'--onsite'},
   {key:'grd',    name:'Comprada a la red',   css:'--grid-in'},
+  {key:'onsite', name:'Solar consumida en sitio', css:'--onsite'},
   {key:'inj',    name:'Inyectada a la red',  css:'--inject'},
   {key:'sol',    name:'Producción solar',    css:'--solar', line:true},
 ];
@@ -446,9 +446,10 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     if (d.grd[i]==null && d.sol[i]==null) continue;
     const x = pl + i*bw + gap/2;
     const a = d.onsite[i]||0, g = d.grd[i]||0, j = d.inj[i]||0;
-    const yA = y(a), yAG = y(a+g);
-    if (a>0) s += bar(x, y0, yA, cOn, g<=0.0001);
-    if (g>0) s += bar(x, a>0 ? yA-1 : y0, yAG, cG, true);   // 1px surface gap between stacked fills
+    const yG = y(g), yGA = y(g+a);
+    // grid purchase at the bottom, solar used on site stacked on top
+    if (g>0) s += bar(x, y0, yG, cG, a<=0.0001);
+    if (a>0) s += bar(x, g>0 ? yG-1 : y0, yGA, cOn, true);   // 1px surface gap between stacked fills
     if (j>0) s += bar(x, y0, y(-j), cI, false);
   }
   // solar line
@@ -478,8 +479,8 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible');
     const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
-    tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
-                    row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i]);
+    tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cG,'Comprada a la red',d.grd[i])+
+                    row(cOn,'Solar consumida en sitio',d.onsite[i])+row(cI,'Inyectada a la red',d.inj[i]);
     tip.style.display = 'block';
     const px = cx/W*rc.width, tw = tip.offsetWidth;
     tip.style.left = Math.max(0, Math.min(rc.width - tw, px - tw/2)) + 'px';
