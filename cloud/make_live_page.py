@@ -287,12 +287,10 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     </button>
     <div class="box" id="detBox" hidden>
       <div class="jt" id="jTiles"></div>
-      <div class="legend"><span><span class="sw" style="background:var(--solar);opacity:.55"></span>Potencia, kW (izq.)</span>
-        <span><span class="ln" style="background:var(--inject)"></span>Energía acumulada, kWh (der.)</span></div>
+      <div class="legend"><span><span class="sw" style="background:var(--solar);opacity:.55"></span>Potencia solar (kW), cada 5 minutos</span></div>
       <div class="chart" id="cJ"><div class="msg2">Cargando datos…</div></div>
       <div class="row"><span id="jNote"></span>
         <button class="close" id="detClose" type="button">&#10005; Cerrar</button></div>
-      <div class="row"><a href="http://172.16.121.30/" target="_blank" rel="noopener">Abrir medidor Janitza (requiere VPN)</a></div>
     </div>
   </section>
   </header>
@@ -643,29 +641,25 @@ draw();
   const plot = () => {
     if (!J || box.hidden) return;
     if (!J.kw.length) { el.innerHTML = '<div class="msg2">Todavía no hay datos de hoy.</div>'; return; }
-    const W = Math.max(300, el.clientWidth || 600), Hh = 230, L = 40, R = 44, T = 10, B = 24;
+    const W = Math.max(300, el.clientWidth || 600), Hh = 230, L = 40, R = 12, T = 10, B = 24;
     const pw = W-L-R, ph = Hh-T-B;
     // x axis: 06:00-20:00 unless data falls outside
     const x0 = Math.min(360, J.min[0]-5), x1 = Math.max(1200, J.min[J.min.length-1]);
     const X = m => L + (m-x0)/(x1-x0)*pw;
     const cum = []; let c = 0; for (const v of J.kw) { c += v*J.step/60; cum.push(c); }
     const sk = niceStep(Math.max(...J.kw, 1), 4), kmax = Math.ceil(Math.max(...J.kw, 1)/sk)*sk;
-    const se = niceStep(Math.max(c, 1), 4), emax = Math.ceil(Math.max(c, 1)/se)*se;
-    const Yk = v => T + ph - v/kmax*ph, Ye = v => T + ph - v/emax*ph;
-    const sol = col('--solar'), inj = col('--inject'), ax = col('--axis'), ink2 = col('--ink2'), rule = col('--rule');
+    const Yk = v => T + ph - v/kmax*ph;
+    const sol = col('--solar'), ax = col('--axis'), ink2 = col('--ink2'), rule = col('--rule');
     let g = '';
     for (let v=0; v<=kmax+1e-9; v+=sk) {
       g += '<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Yk(v)+'" y2="'+Yk(v)+'" stroke="'+rule+'"/>';
       g += '<text x="'+(L-5)+'" y="'+(Yk(v)+4)+'" text-anchor="end" font-size="10" fill="'+ink2+'">'+fmt(v,0)+'</text>';
     }
-    for (let v=0; v<=emax+1e-9; v+=se)
-      g += '<text x="'+(L+pw+5)+'" y="'+(Ye(v)+4)+'" font-size="10" fill="'+inj+'">'+fmt(v,0)+'</text>';
     for (let h=Math.ceil(x0/60); h*60<=x1; h++) if (h%2===0)
       g += '<text x="'+X(h*60)+'" y="'+(Hh-6)+'" text-anchor="middle" font-size="10" fill="'+ink2+'">'+String(h).padStart(2,'0')+'</text>';
     const pts = J.min.map((m,i) => X(m).toFixed(1)+','+Yk(J.kw[i]).toFixed(1));
     const area = 'M'+X(J.min[0]).toFixed(1)+','+Yk(0)+' L'+pts.join(' L')+' L'+X(J.min[J.min.length-1]).toFixed(1)+','+Yk(0)+' Z';
     g += '<path d="'+area+'" fill="'+sol+'" fill-opacity=".35" stroke="'+sol+'" stroke-width="1.5"/>';
-    g += '<polyline points="'+J.min.map((m,i) => X(m).toFixed(1)+','+Ye(cum[i]).toFixed(1)).join(' ')+'" fill="none" stroke="'+inj+'" stroke-width="2"/>';
     g += '<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Yk(0)+'" y2="'+Yk(0)+'" stroke="'+ax+'"/>';
     g += '<line id="jCur" y1="'+T+'" y2="'+(T+ph)+'" stroke="'+ax+'" stroke-dasharray="3 3" visibility="hidden"/>';
     el.innerHTML = '<svg viewBox="0 0 '+W+' '+Hh+'" role="img" aria-label="Potencia y energía solar de hoy">'+g+'</svg><div class="tip" id="jTip"></div>';
