@@ -228,7 +228,10 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .cam{margin:12px 0}
 .cam button.open{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;
   border:1px solid var(--rule);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;text-align:left}
-.cam button.open:hover{border-color:var(--axis)}
+.cam button.open:hover,.cam a.open:hover{border-color:var(--axis)}
+.cam a.open{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;box-sizing:border-box;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);font-weight:600;text-decoration:none}
+.cam a.open:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
 .cam button.open:focus-visible,.cam button.close:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
 .cam button.open[disabled]{cursor:default;color:var(--ink3);font-weight:500}
 .cam .play{width:26px;height:26px;border-radius:50%;background:var(--grid-in);color:#fff;display:grid;place-items:center;
@@ -305,6 +308,14 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
   </section>
 
   <section class="tiles" id="tiles" aria-label="Hoy hasta ahora"></section>
+
+  <section class="cam" id="det" hidden aria-label="Detalles técnicos">
+    <a class="open" id="detBtn" href="http://172.16.121.30/" target="_blank" rel="noopener">
+      <span class="play" style="background:var(--inject)" aria-hidden="true">&#9881;</span>
+      <span>Detalles del medidor Janitza</span>
+      <span class="sub2">requiere VPN conectada</span>
+    </a>
+  </section>
 
   <details>
     <summary>Tabla por hora</summary>
@@ -599,6 +610,18 @@ draw();
 })();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
+
+// ---- private "Detalles" shortcut: shown only on this browser after opening the page once with ?h=1 (?h=0 hides it) ----
+(function(){
+  let on = false;
+  try {
+    const h = new URLSearchParams(location.search).get('h');
+    if (h === '1') localStorage.setItem('detallesH', '1');
+    if (h === '0') localStorage.removeItem('detallesH');
+    on = localStorage.getItem('detallesH') === '1';
+  } catch(e) { on = new URLSearchParams(location.search).get('h') === '1'; }
+  if (on) document.getElementById('det').hidden = false;
+})();
 
 // ---- hourly table ----
 let t = '<thead><tr><th>Hora</th><th>Solar</th><th>Consumida en sitio</th><th>Desde la red</th><th>A la red</th><th>Consumo total</th></tr></thead><tbody>';
