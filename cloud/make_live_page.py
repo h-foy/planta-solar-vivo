@@ -271,6 +271,13 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     <h1>Planta solar &middot; energía en vivo</h1>
     <div class="sub" id="sub"></div>
     <div class="stale" id="stale" role="status"><span aria-hidden="true">&#9888;</span><span id="staleText"></span></div>
+      <section class="cam" id="det" hidden aria-label="Detalles técnicos">
+    <a class="open" id="detBtn" href="http://172.16.121.30/" target="_blank" rel="noopener">
+      <span class="play" style="background:var(--inject)" aria-hidden="true">&#9881;</span>
+      <span>Janitza</span>
+      <span class="sub2">medidor de la planta · requiere VPN</span>
+    </a>
+  </section>
   </header>
 
   <section class="card">
@@ -309,13 +316,6 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
 
   <section class="tiles" id="tiles" aria-label="Hoy hasta ahora"></section>
 
-  <section class="cam" id="det" hidden aria-label="Detalles técnicos">
-    <a class="open" id="detBtn" href="http://172.16.121.30/" target="_blank" rel="noopener">
-      <span class="play" style="background:var(--inject)" aria-hidden="true">&#9881;</span>
-      <span>Detalles del medidor Janitza</span>
-      <span class="sub2">requiere VPN conectada</span>
-    </a>
-  </section>
 
   <details>
     <summary>Tabla por hora</summary>
