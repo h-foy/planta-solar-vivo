@@ -258,7 +258,8 @@ summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 2px}
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
 th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--rule)}
 th:first-child,td:first-child{text-align:left}
-th{color:var(--ink2);font-weight:600;font-size:12px}
+th{color:var(--ink);font-weight:700;font-size:12px}
+thead th{border-bottom:2px solid var(--ink)}
 tfoot td{font-weight:650}
 footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
 </style>
