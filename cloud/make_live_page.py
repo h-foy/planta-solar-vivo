@@ -226,12 +226,6 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .tip div{display:flex;align-items:center;gap:6px}
 .tip div span:last-child{margin-left:auto;padding-left:12px}
 .cam{margin:12px 0}
-.cam .jt{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:2px 0 10px}
-.cam .jt>div{border:1px solid var(--rule);border-radius:10px;padding:8px}
-.cam .jt .k{font-size:11px;color:var(--ink2)}
-.cam .jt .v{font-size:18px;font-weight:650;font-variant-numeric:tabular-nums}
-.cam .jt .v small{font-size:12px;font-weight:500;color:var(--ink2);margin-left:2px}
-.cam .jt .d{font-size:11px;color:var(--ink3)}
 .cam .msg2{padding:30px 8px;text-align:center;color:var(--ink2);font-size:13px}
 .cam .row a{color:var(--ink2)}
 .cam button.open{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;
@@ -279,25 +273,11 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     <h1>Planta solar &middot; energía en vivo</h1>
     <div class="sub" id="sub"></div>
     <div class="stale" id="stale" role="status"><span aria-hidden="true">&#9888;</span><span id="staleText"></span></div>
-  <section class="cam" id="det" aria-label="Producción solar total (Janitza)">
-    <button class="open" id="detBtn" type="button" aria-expanded="false" aria-controls="detBox">
-      <span class="play" style="background:var(--solar)" aria-hidden="true">&#9728;</span>
-      <span id="detLabel">Janitza</span>
-      <span class="sub2" id="detSub">producción solar total · cada 5 min</span>
-    </button>
-    <div class="box" id="detBox" hidden>
-      <div class="jt" id="jTiles"></div>
-      <div class="legend"><span><span class="sw" style="background:var(--solar);opacity:.55"></span>Potencia solar (kW), cada 5 minutos</span></div>
-      <div class="chart" id="cJ"><div class="msg2">Cargando datos…</div></div>
-      <div class="row"><span id="jNote"></span>
-        <button class="close" id="detClose" type="button">&#10005; Cerrar</button></div>
-    </div>
-  </section>
   </header>
 
   <section class="card">
-    <h2>SMEC Data cada 15 minutos</h2>
-    <p class="note">kWh por intervalo de 15 minutos. Barras sobre la línea: lo que consumió el sitio. Debajo de la línea: energía solar inyectada a la red.</p>
+    <h2>SMEC · potencia cada 15 minutos</h2>
+    <p class="note">kW promedio de cada intervalo de 15 minutos (kWh del medidor &times; 4). Barras sobre la línea: lo que consumió el sitio. Debajo de la línea: solar inyectada a la red.</p>
     <div class="legend" id="legend1"></div>
     <div class="chart" id="c15"></div>
   </section>
@@ -439,7 +419,8 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
   const y = v => pt + (top - v)/(top+bot)*ih;
   const bw = iw/slots, gap = Math.max(1, Math.min(2, bw*0.18)), w = Math.max(1, bw-gap);
   const r = Math.min(4, w/2);
-  let s = '<svg viewBox="0 0 '+W+' '+Hh+'" role="img" aria-label="Gráfico de energía">';
+  const unit = opt.unit || 'kWh';
+  let s = '<svg viewBox="0 0 '+W+' '+Hh+'" role="img" aria-label="'+(unit==='kW' ? 'Gráfico de potencia' : 'Gráfico de energía')+'">';
   for (let v=-bot; v<=top+1e-9; v+=step){
     const yy = y(v);
     s += '<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+yy+'" y2="'+yy+'" stroke="'+(Math.abs(v)<1e-9?col('--axis'):col('--grid'))+'" stroke-width="1"/>';
@@ -507,7 +488,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     let i = Math.floor((sx-pl)/bw); i = Math.max(0, Math.min(slots-1, i));
     if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible');
-    const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' kWh')+'</span></div>';
+    const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
     tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
                     row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i]);
     tip.style.display = 'block';
@@ -569,8 +550,10 @@ document.getElementById('segDay').addEventListener('click', () => { setMode(fals
 document.getElementById('seg5').addEventListener('click', () => { setMode(true); draw(); });
 setMode(mode5);
 
+// 15-minute chart in kW: average power of each interval = kWh x 4
+const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
 function draw(){
-  chart('c15', q, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15));
+  chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15), {unit:'kW'});
   if (mode5 && F) chart('c60', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps});
   else chart('c60', H, 24, 3, i => hhmm(i*60), i => hhmm(i*60)+'–'+hhmm(i*60+60));
 }
@@ -624,86 +607,6 @@ draw();
   document.getElementById('camClose').addEventListener('click', () => { close(); btn.focus(); });
 })();
 
-// ---- Janitza panel: total solar production every 5 minutes (from the SMA portal, nube/sma.json) ----
-(function(){
-  const btn = document.getElementById('detBtn'), box = document.getElementById('detBox');
-  const el = document.getElementById('cJ');
-  let J = null;
-  const KEY = 'janitzaOpen';
-  const tiles = () => {
-    const nowKw = J.kw.length ? J.kw[J.kw.length-1] : null;
-    const t = (k,v,u,d) => '<div><div class="k">'+k+'</div><div class="v">'+v+'<small>'+u+'</small></div><div class="d">'+d+'</div></div>';
-    document.getElementById('jTiles').innerHTML =
-      t('Energía', fmt(J.kwh,0), 'kWh', 'desde las '+hhmm((J.min[0]||0))) +
-      t('Potencia', fmt(nowKw,0), 'kW', 'a las '+hhmm(J.min[J.min.length-1]||0)) +
-      t('Pico', fmt(J.peak_kw,0), 'kW', 'a las '+hhmm(J.peak_at||0));
-  };
-  const plot = () => {
-    if (!J || box.hidden) return;
-    if (!J.kw.length) { el.innerHTML = '<div class="msg2">Todavía no hay datos de hoy.</div>'; return; }
-    const W = Math.max(300, el.clientWidth || 600), Hh = 230, L = 40, R = 12, T = 10, B = 24;
-    const pw = W-L-R, ph = Hh-T-B;
-    // x axis: 06:00-20:00 unless data falls outside
-    const x0 = Math.min(360, J.min[0]-5), x1 = Math.max(1200, J.min[J.min.length-1]);
-    const X = m => L + (m-x0)/(x1-x0)*pw;
-    const cum = []; let c = 0; for (const v of J.kw) { c += v*J.step/60; cum.push(c); }
-    const sk = niceStep(Math.max(...J.kw, 1), 4), kmax = Math.ceil(Math.max(...J.kw, 1)/sk)*sk;
-    const Yk = v => T + ph - v/kmax*ph;
-    const sol = col('--solar'), ax = col('--axis'), ink2 = col('--ink2'), rule = col('--rule');
-    let g = '';
-    for (let v=0; v<=kmax+1e-9; v+=sk) {
-      g += '<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Yk(v)+'" y2="'+Yk(v)+'" stroke="'+rule+'"/>';
-      g += '<text x="'+(L-5)+'" y="'+(Yk(v)+4)+'" text-anchor="end" font-size="10" fill="'+ink2+'">'+fmt(v,0)+'</text>';
-    }
-    for (let h=Math.ceil(x0/60); h*60<=x1; h++) if (h%2===0)
-      g += '<text x="'+X(h*60)+'" y="'+(Hh-6)+'" text-anchor="middle" font-size="10" fill="'+ink2+'">'+String(h).padStart(2,'0')+'</text>';
-    const pts = J.min.map((m,i) => X(m).toFixed(1)+','+Yk(J.kw[i]).toFixed(1));
-    const area = 'M'+X(J.min[0]).toFixed(1)+','+Yk(0)+' L'+pts.join(' L')+' L'+X(J.min[J.min.length-1]).toFixed(1)+','+Yk(0)+' Z';
-    g += '<path d="'+area+'" fill="'+sol+'" fill-opacity=".35" stroke="'+sol+'" stroke-width="1.5"/>';
-    g += '<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Yk(0)+'" y2="'+Yk(0)+'" stroke="'+ax+'"/>';
-    g += '<line id="jCur" y1="'+T+'" y2="'+(T+ph)+'" stroke="'+ax+'" stroke-dasharray="3 3" visibility="hidden"/>';
-    el.innerHTML = '<svg viewBox="0 0 '+W+' '+Hh+'" role="img" aria-label="Potencia y energía solar de hoy">'+g+'</svg><div class="tip" id="jTip"></div>';
-    const svg = el.querySelector('svg'), tip = document.getElementById('jTip'), cur = document.getElementById('jCur');
-    const move = ev => {
-      const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
-      const m = x0 + (px-L)/pw*(x1-x0);
-      let i = 0, best = 1e9; J.min.forEach((v,k) => { const d = Math.abs(v-m); if (d<best) { best=d; i=k; } });
-      if (best > 20) { tip.style.display='none'; cur.setAttribute('visibility','hidden'); return; }
-      cur.setAttribute('x1', X(J.min[i])); cur.setAttribute('x2', X(J.min[i])); cur.setAttribute('visibility','visible');
-      tip.innerHTML = '<b>'+hhmm(J.min[i]-J.step)+'–'+hhmm(J.min[i])+'</b><div><span>Potencia</span><span>'+fmt(J.kw[i],0)+' kW</span></div>'+
-        '<div><span>Acumulado</span><span>'+fmt(cum[i],0)+' kWh</span></div>';
-      tip.style.display = 'block';
-      const left = (X(J.min[i]) / W) * r.width;
-      tip.style.left = Math.min(Math.max(0, left - tip.offsetWidth/2), r.width - tip.offsetWidth) + 'px';
-      tip.style.top = '4px';
-    };
-    svg.addEventListener('pointermove', move); svg.addEventListener('pointerdown', move);
-    svg.addEventListener('pointerleave', () => { tip.style.display='none'; cur.setAttribute('visibility','hidden'); });
-  };
-  const load = () => fetch('sma.json?t=' + Date.now(), {cache:'no-store'}).then(r => { if (!r.ok) throw 0; return r.json(); }).then(j => {
-    // drop the zero rows before sunrise (and after sunset) so the chart starts with the production
-    let a = j.kw.findIndex(v => v > 0), z = j.kw.length - 1 - [...j.kw].reverse().findIndex(v => v > 0);
-    if (a < 0) { a = 0; z = -1; } else { a = Math.max(0, a-1); z = Math.min(j.kw.length-1, z+1); }
-    const today0 = (D.date || '').slice(0,10);
-    if (j.date === today0) z = j.kw.length - 1;            // today: keep up to the latest reading
-    j.min = j.min.slice(a, z+1); j.kw = j.kw.slice(a, z+1);
-    J = j;
-    const today = (D.date || '').slice(0,10);
-    const note = document.getElementById('jNote');
-    const ds = j.date.split('-').reverse().join('/');
-    note.textContent = 'Datos SMA/Janitza hasta las ' + hhmm(j.min[j.min.length-1]||0) + (today && j.date !== today ? ' del ' + ds : '') + ' · actualizado ' + j.updated.slice(11);
-    document.getElementById('detSub').textContent = fmt(j.kwh,0) + ' kWh ' + (today && j.date !== today ? 'el ' + ds : 'hoy') + ' · producción solar total';
-    tiles(); plot();
-  }).catch(() => { el.innerHTML = '<div class="msg2">Todavía no hay datos de la Janitza.</div>'; });
-  const open = () => { box.hidden = false; btn.setAttribute('aria-expanded','true'); try { localStorage.setItem(KEY,'1'); } catch(e) {} J ? plot() : null; load(); };
-  const close = () => { box.hidden = true; btn.setAttribute('aria-expanded','false'); try { localStorage.removeItem(KEY); } catch(e) {} };
-  btn.addEventListener('click', () => box.hidden ? open() : close());
-  document.getElementById('detClose').addEventListener('click', () => { close(); btn.focus(); });
-  addEventListener('resize', () => setTimeout(plot, 160));
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', plot);
-  let was = false; try { was = localStorage.getItem(KEY) === '1'; } catch(e) {}
-  if (was) open(); else load();
-})();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
 
@@ -714,10 +617,10 @@ const hs = k => sum(H[k].slice(0,nh));
 t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(hs('sol'))+'</td><td>'+fmt(hs('onsite'))+'</td><td>'+fmt(hs('grd'))+'</td><td>'+fmt(hs('inj'))+'</td><td>'+fmt(hs('onsite')+hs('grd'))+'</td></tr></tfoot>';
 document.getElementById('tbl').innerHTML = t;
 
-document.getElementById('foot').innerHTML = 'Todos los valores en kWh, leídos de los medidores de la planta cada 15 minutos. '+
+document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
   'Página generada el '+D.built+' (hora de Argentina); se actualiza sola cada 5 minutos.';
 
-if (D.snapshot) document.getElementById('foot').innerHTML = 'Todos los valores en kWh, leídos de los medidores de la planta. '+
+if (D.snapshot) document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
   '<b>Vista de prueba</b> con datos hasta las '+D.last+'. La versión definitiva se actualizará sola cada 15 minutos.';
 // refresh: reload every 5 minutes, bypassing stale copies
 if (!D.snapshot) setTimeout(() => { location.replace(location.pathname + '?t=' + Date.now()); }, 5*60*1000);
