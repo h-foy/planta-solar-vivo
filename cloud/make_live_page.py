@@ -64,7 +64,7 @@ def previous_solar(prev_page, date_iso):
 
 
 def history(dirs, today, ndays=4):
-    """Hourly sums for the ndays complete days before `today` (YYYYMMDD), oldest first.
+    """15-minute kWh values (96 per day) for the ndays complete days before `today` (YYYYMMDD), oldest first.
     Looks for full-day files (no _hasta_) in the given folders and their subfolders."""
     files = {}
     for d in dirs:
@@ -83,17 +83,13 @@ def history(dirs, today, ndays=4):
             continue
         ag, ds = parse(pair['AGRIM02P']), parse(pair['DAGSR01P'])
         n = min(len(ag), len(ds), 96)
-        hours = {'sol': [], 'inj': [], 'grd': []}
-        for h in range(24):
-            if 4 * h + 4 <= n:
-                rows = range(4 * h, 4 * h + 4)
-                hours['sol'].append(round(sum(ag[i][0] for i in rows), 3))
-                hours['inj'].append(round(sum(ds[i][0] for i in rows), 3))
-                hours['grd'].append(round(sum(ds[i][1] for i in rows), 3))
-            else:
-                for v in hours.values():
-                    v.append(None)
-        out.append({'date': f'{day[:4]}-{day[4:6]}-{day[6:]}', **hours})
+        vals = {'sol': [], 'inj': [], 'grd': []}
+        for i in range(96):
+            ok = i < n
+            vals['sol'].append(round(ag[i][0], 3) if ok else None)
+            vals['inj'].append(round(ds[i][0], 3) if ok else None)
+            vals['grd'].append(round(ds[i][1], 3) if ok else None)
+        out.append({'date': f'{day[:4]}-{day[4:6]}-{day[6:]}', **vals})
     return out
 
 
@@ -276,10 +272,17 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
   </header>
 
   <section class="card">
-    <h2>SMEC · potencia cada 15 minutos</h2>
-    <p class="note">kW promedio de cada intervalo de 15 minutos (kWh del medidor &times; 4). Barras sobre la línea: lo que consumió el sitio. Debajo de la línea: solar inyectada a la red.</p>
+    <div class="hd">
+      <h2>SMEC · potencia cada 15 minutos</h2>
+      <div class="seg" role="group" aria-label="Período del gráfico">
+        <button type="button" id="segDay" aria-pressed="true">Hoy</button>
+        <button type="button" id="seg5" aria-pressed="false">5 días</button>
+      </div>
+    </div>
+    <p class="note" id="n15"></p>
     <div class="legend" id="legend1"></div>
     <div class="chart" id="c15"></div>
+    <div class="days" id="days5" hidden></div>
   </section>
 
   <section class="cam" id="cam" aria-label="Cámara de la planta">
@@ -295,19 +298,6 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     </div>
   </section>
 
-  <section class="card" id="hourCard">
-    <div class="hd">
-      <h2 id="h60">Por hora</h2>
-      <div class="seg" role="group" aria-label="Período del gráfico por hora">
-        <button type="button" id="segDay" aria-pressed="true">Hoy</button>
-        <button type="button" id="seg5" aria-pressed="false">5 días</button>
-      </div>
-    </div>
-    <p class="note" id="n60">Solo horas completas (la hora 13:00 = de 13:00 a 14:00).</p>
-    <div class="legend" id="legend2"></div>
-    <div class="chart" id="c60"></div>
-    <div class="days" id="days5" hidden></div>
-  </section>
 
   <section class="tiles" id="tiles" aria-label="Hoy hasta ahora"></section>
 
@@ -398,7 +388,6 @@ const legendHTML = S.map(s => s.line
   ? '<span><span class="ln"></span>'+s.name+'</span>'
   : '<span><span class="sw" style="background:var('+s.css+')"></span>'+s.name+'</span>').join('');
 document.getElementById('legend1').innerHTML = legendHTML;
-document.getElementById('legend2').innerHTML = legendHTML;
 
 // ---- chart ----
 function niceStep(range, target){
@@ -417,7 +406,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
   const step = niceStep(up+dn, 5);
   const top = Math.ceil(up/step)*step, bot = dn>0 ? Math.ceil(dn/step)*step : 0;
   const y = v => pt + (top - v)/(top+bot)*ih;
-  const bw = iw/slots, gap = Math.max(1, Math.min(2, bw*0.18)), w = Math.max(1, bw-gap);
+  const bw = iw/slots, gap = bw < 3 ? 0 : Math.max(1, Math.min(2, bw*0.18)), w = Math.max(.5, bw-gap);
   const r = Math.min(4, w/2);
   const unit = opt.unit || 'kWh';
   let s = '<svg viewBox="0 0 '+W+' '+Hh+'" role="img" aria-label="'+(unit==='kW' ? 'Gráfico de potencia' : 'Gráfico de energía')+'">';
@@ -501,7 +490,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
   svg.addEventListener('touchstart', show, {passive:true}); svg.addEventListener('touchmove', show, {passive:true});
   document.addEventListener('touchstart', e => { if (!box.contains(e.target)) hide(); }, {passive:true});
 }
-// ---- 5-day view: previous days (hourly) + today's complete hours ----
+// ---- 5-day view: previous 4 days + today, every 15 minutes, in kW (kWh x 4) ----
 const dname = iso => { const t = new Date(iso+'T12:00:00');
   return t.toLocaleDateString('es-AR',{weekday:'short'}).replace('.','')+' '+t.getDate(); };
 const F = (function(){
@@ -511,18 +500,19 @@ const F = (function(){
   const add = (iso, sol, inj, grd) => {
     const base = f.sol.length;
     if (base) f.seps.push(base);
-    f.ticks.push([base+12, dname(iso)]);
-    for (let h=0;h<24;h++){
-      const s0 = sol[h], j = inj[h], g = grd[h];
+    f.ticks.push([base+48, dname(iso)]);
+    const k4 = v => v==null ? null : v*4;
+    for (let i=0;i<96;i++){
+      const s0 = k4(sol[i]), j = k4(inj[i]), g = k4(grd[i]);
       f.sol.push(s0); f.inj.push(j); f.grd.push(g);
-      f.onsite.push(s0==null ? null : Math.max(0, s0-j));
-      f.lab.push([iso,h]);
+      f.onsite.push(s0==null ? null : Math.max(0, s0-(j||0)));
+      f.lab.push([iso,i]);
     }
   };
   for (const d of hist) add(d.date, d.sol, d.inj, d.grd);
-  add(D.date, H.sol, H.inj, H.grd);
+  add(D.date, q.sol, q.inj, q.grd);
   f.tip = i => { const [iso,h] = f.lab[i]; const t = new Date(iso+'T12:00:00');
-    return t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'numeric'}).replace('.','')+' · '+hhmm(h*60)+'–'+hhmm(h*60+60); };
+    return t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'numeric'}).replace('.','')+' · '+hhmm(h*15)+'–'+hhmm(h*15+15); };
   // per-day totals
   const tot = a => a.reduce((t,x)=>t+(x||0),0);
   const rows = hist.map(d => [d.date, tot(d.sol), tot(d.grd), tot(d.inj), false]);
@@ -539,9 +529,9 @@ function setMode(five){
   mode5 = !!(five && F);
   document.getElementById('segDay').setAttribute('aria-pressed', String(!mode5));
   document.getElementById('seg5').setAttribute('aria-pressed', String(mode5));
-    document.getElementById('n60').textContent = mode5
-    ? 'Últimos 5 días: los 4 días anteriores y hoy hasta la última hora completa. Totales por día (kWh) debajo del gráfico.'
-    : 'Solo horas completas (la hora 13:00 = de 13:00 a 14:00).';
+  document.getElementById('n15').innerHTML = mode5
+    ? 'Últimos 5 días: los 4 días anteriores y hoy hasta la última lectura, en kW promedio de cada 15 minutos. Totales por día (kWh) debajo del gráfico.'
+    : 'kW promedio de cada intervalo de 15 minutos (kWh del medidor &times; 4). Barras sobre la línea: lo que consumió el sitio. Debajo de la línea: solar inyectada a la red.';
   document.getElementById('days5').hidden = !mode5;
   try { localStorage.setItem('vista60', mode5 ? '5d' : 'hoy'); } catch(e) {}
 }
@@ -553,9 +543,8 @@ setMode(mode5);
 // 15-minute chart in kW: average power of each interval = kWh x 4
 const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
 function draw(){
-  chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15), {unit:'kW'});
-  if (mode5 && F) chart('c60', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps});
-  else chart('c60', H, 24, 3, i => hhmm(i*60), i => hhmm(i*60)+'–'+hhmm(i*60+60));
+  if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps, unit:'kW'});
+  else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15), {unit:'kW'});
 }
 draw();
 
