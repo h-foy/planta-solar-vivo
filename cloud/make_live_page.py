@@ -137,7 +137,7 @@ def build(src, dest, snapshot=False, hist_dirs=(), prev_page=None):
         'cam': camera_url(),
         'hist': history([src, *hist_dirs], day),
     }
-    html = TEMPLATE.replace('/*DATA*/null', json.dumps(data, separators=(',', ':')))
+    html = render(data)
     if snapshot:   # page body only (the publisher adds its own document skeleton)
         for tag in ('<!doctype html>', '<html lang="es-AR">', '<head>', '</head>', '<body>', '</body>', '</html>',
                     '<meta charset="utf-8">',
@@ -152,7 +152,67 @@ def build(src, dest, snapshot=False, hist_dirs=(), prev_page=None):
     os.replace(tmp, out)
     print(f'{data["date"]}  {n}/96 intervals, up to {data["last"]} (solar up to {data["solLast"] or "none"}), history days: '
           f'{", ".join(h["date"][5:] for h in data["hist"]) or "none"}  ->  {out}')
+    if hist_dirs and not snapshot:
+        build_day_pages([d for d in hist_dirs if d], dest)
     return out
+
+
+def render(data):
+    return TEMPLATE.replace('/*DATA*/null', json.dumps(data, separators=(',', ':')))
+
+
+def full_days(dirs):
+    """{YYYYMMDD: {meter: path}} for every day that has full-day files (no _hasta_) of both meters."""
+    files = {}
+    for d in dirs:
+        if not d or not os.path.isdir(d):
+            continue
+        for p in glob.glob(os.path.join(d, '**', '*.PRN'), recursive=True):
+            m = PAT.search(os.path.basename(p))
+            if m and not m.group(3) and '_discarded' not in p and 'parciales' not in p:
+                files.setdefault(m.group(2), {})[m.group(1).upper()] = p
+    return {k: v for k, v in files.items() if len(v) == 2}
+
+
+def write_if_changed(path, text):
+    try:
+        with open(path, encoding='utf-8') as f:
+            if f.read() == text:
+                return False
+    except FileNotFoundError:
+        pass
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        f.write(text)
+    os.replace(tmp, path)
+    return True
+
+
+def build_day_pages(dirs, dest):
+    """One page per archived day: <dest>/dias/YYYY-MM-DD.html, plus dias/index.json (list of dates).
+    A page is only rewritten when its content changes, so the repository does not churn."""
+    days = full_days(dirs)
+    out_dir = os.path.join(dest, 'dias')
+    os.makedirs(out_dir, exist_ok=True)
+    written = 0
+    for day in sorted(days):
+        pair = days[day]
+        ag, ds = parse(pair['AGRIM02P']), parse(pair['DAGSR01P'])
+        n = min(len(ds), len(ag), 96)
+        if n < 96:
+            continue                                   # only complete days
+        r3 = lambda x: round(x, 3)
+        data = {
+            'date': f'{day[:4]}-{day[4:6]}-{day[6:]}', 'n': n, 'ns': n, 'last': '24:00', 'solLast': '24:00',
+            'built': '', 'sol': [r3(r[0]) for r in ag[:n]], 'inj': [r3(r[0]) for r in ds[:n]],
+            'grd': [r3(r[1]) for r in ds[:n]], 'snapshot': False, 'archive': True, 'cam': '',
+            'hist': history(dirs, day),
+        }
+        if write_if_changed(os.path.join(out_dir, data['date'] + '.html'), render(data)):
+            written += 1
+    dates = [f'{d[:4]}-{d[4:6]}-{d[6:]}' for d in sorted(days)]
+    write_if_changed(os.path.join(out_dir, 'index.json'), json.dumps({'dates': dates}, separators=(',', ':')))
+    print(f'day pages: {len(dates)} days archived, {written} page(s) written -> {out_dir}')
 
 
 TEMPLATE = r'''<!doctype html>
@@ -271,6 +331,36 @@ th{color:var(--ink);font-weight:700;font-size:12px}
 thead th{border-bottom:2px solid var(--ink)}
 tfoot td{font-weight:650}
 footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
+.daynav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 0}
+.daynav input[type=date]{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--rule);border-radius:9px;
+  background:var(--card);color:var(--ink)}
+.daynav .btn{font:inherit;font-size:13px;padding:6px 11px;border:1px solid var(--rule);border-radius:9px;background:var(--card);
+  color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.daynav .btn:hover{border-color:var(--axis)}
+.daynav .btn[aria-disabled="true"]{opacity:.4;pointer-events:none}
+.daynav .btn:focus-visible,.daynav input:focus-visible{outline:2px solid var(--inject);outline-offset:1px}
+.daynav .lbl{font-size:13px;color:var(--ink2)}
+.daynav .print{margin-left:auto}
+.daynav .msg3{flex-basis:100%;font-size:12px;color:var(--warn-ink)}
+@media print{
+  @page{size:A4 portrait;margin:11mm}
+  html,body{background:#fff !important;font-size:12px}
+  html,body{min-height:0 !important}
+  main{max-width:none;padding:0}
+  .daynav,.seg,#cam,.stale,.tip,details.tblbox>summary{display:none !important}
+  header h1{font-size:17px}
+  .card{border-color:#ccc;padding:6px 8px 2px;margin:6px 0;break-inside:avoid}
+  .card .note{display:none}
+  .tiles{grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:6px;margin:8px 0;break-inside:avoid}
+  .tile{padding:6px 8px;border-color:#ccc}
+  .tile .v{font-size:16px;margin-top:1px}
+  details.tblbox{margin:6px 0}
+  details.tblbox .box{border:0;padding:0;margin:0}
+  table{font-size:10px}
+  th,td{padding:1px 4px}
+  footer{margin-top:4px;font-size:9px}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 </style>
 </head>
 <body>
@@ -279,6 +369,15 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     <h1>Planta solar &middot; energía en vivo</h1>
     <div class="sub" id="sub"></div>
     <div class="stale" id="stale" role="status"><span aria-hidden="true">&#9888;</span><span id="staleText"></span></div>
+    <nav class="daynav" id="daynav" aria-label="Elegir día">
+      <a class="btn" id="dPrev" href="#" aria-label="Día anterior">&#9664;</a>
+      <label class="lbl" for="dPick">Ver día</label>
+      <input type="date" id="dPick">
+      <a class="btn" id="dNext" href="#" aria-label="Día siguiente">&#9654;</a>
+      <a class="btn" id="dToday" href="#">Hoy en vivo</a>
+      <button class="btn print" id="dPrint" type="button">&#128438; Imprimir / PDF</button>
+      <span class="msg3" id="dMsg" hidden></span>
+    </nav>
   </header>
 
   <section class="card">
@@ -355,11 +454,17 @@ W.use = W.onsite + W.grd;
 // ---- header ----
 const dObj = new Date(D.date+'T12:00:00');
 const dTxt = dObj.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-document.getElementById('sub').innerHTML = dTxt + ' &middot; lecturas hasta las <b>'+D.last+'</b>';
+document.getElementById('sub').innerHTML = dTxt + (D.archive ? ' &middot; <b>día completo</b>' : ' &middot; lecturas hasta las <b>'+D.last+'</b>');
+if (D.archive){
+  document.querySelector('header h1').textContent = 'Planta solar · informe del día';
+  document.title = 'Planta Solar · ' + D.date;
+  document.getElementById('segDay').textContent = 'Día';
+  document.getElementById('cam').hidden = true;
+}
 
 // stale check against Argentina time (UTC-3, no DST)
 (function(){
-  if (D.snapshot) return;
+  if (D.snapshot || D.archive) return;
   const nowAR = new Date(Date.now() - 3*3600e3);
   const todayAR = nowAR.toISOString().slice(0,10);
   const minsNow = nowAR.getUTCHours()*60 + nowAR.getUTCMinutes();
@@ -379,13 +484,14 @@ document.getElementById('sub').innerHTML = dTxt + ' &middot; lecturas hasta las 
 // ---- tiles ----
 const pct = (a,b) => b>0 ? Math.round(a/b*100)+'%' : '–';
 const lastKw = ns>0 ? D.sol[ns-1]*4 : 0;
+const peakI = D.sol.reduce((b,v,i,a) => v > a[b] ? i : b, 0), peakKw = (D.sol[peakI]||0)*4;
 const solNote = ns < n ? (ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares todavía') : null;
 const upto = ns < n ? ' (hasta las '+(D.solLast||'00:00')+')' : '';
 const tiles = [
   ['Consumo total del sitio', fmt(ns<n ? W.use : T.use,0)+'<small>kWh</small>', ns<n ? 'hasta las '+(D.solLast||'00:00')+' (falta el dato solar)' : 'solar consumida + comprada a la red', null],
   ['Comprada a la red', fmt(T.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(W.grd,W.use)+upto, '--grid-in'],
   ['Solar consumida en sitio', fmt(T.onsite,0)+'<small>kWh</small>', solNote || ('Autoconsumo '+pct(T.onsite,T.sol)), '--onsite'],
-  ['Producción solar', fmt(T.sol,0)+'<small>kWh</small>', solNote || ('Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
+  ['Producción solar', fmt(T.sol,0)+'<small>kWh</small>', solNote || (D.archive ? 'Pico '+fmt(peakKw,0)+' kW a las '+hhmm(peakI*15+15) : 'Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
   ['Inyectada a la red', fmt(T.inj,0)+'<small>kWh</small>', pct(W.inj,W.sol)+' de la producción solar'+upto, '--inject'],
   ['Cobertura solar', pct(W.onsite,W.use), 'del consumo cubierto por solar'+upto, null],
 ];
@@ -400,6 +506,7 @@ const legendHTML = S.map(s => s.line
 document.getElementById('legend1').innerHTML = legendHTML;
 
 // ---- chart ----
+let PRINTING = false;
 function niceStep(range, target){
   const raw = range/target, p = Math.pow(10, Math.floor(Math.log10(raw)));
   const m = raw/p; return (m<=1?1:m<=2?2:m<=2.5?2.5:m<=5?5:10)*p;
@@ -408,7 +515,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
   opt = opt || {};
   const box0 = document.getElementById(el);
   const W = Math.max(300, Math.round(box0.clientWidth || 340));
-  const Hh = Math.round(Math.min(320, Math.max(210, W*0.58))), pl = 34, pr = 6, pt = 10, pb = 24;
+  const Hh = PRINTING ? Math.round(W*0.31) : Math.round(Math.min(320, Math.max(210, W*0.58))), pl = 34, pr = 6, pt = 10, pb = 24;
   const iw = W-pl-pr, ih = Hh-pt-pb;
   let up = 0, dn = 0;
   for (let i=0;i<slots;i++){ up = Math.max(up,(d.onsite[i]||0)+(d.grd[i]||0), d.sol[i]||0); dn = Math.max(dn, d.inj[i]||0); }
@@ -529,7 +636,7 @@ const F = (function(){
   rows.push([D.date, T.sol, T.grd, T.inj, true]);
   let tb = '<table><thead><tr><th>Día</th><th>Solar</th><th>Comprada a la red</th><th>Inyectada</th></tr></thead><tbody>';
   for (const [iso,a,b,c,today] of rows)
-    tb += '<tr><td'+(today?' class="today"':'')+'>'+dname(iso)+(today?' (hasta '+D.last+')':'')+'</td><td>'+fmt(a,0)+'</td><td>'+fmt(b,0)+'</td><td>'+fmt(c,0)+'</td></tr>';
+    tb += '<tr><td'+(today?' class="today"':'')+'>'+dname(iso)+(today && !D.archive ?' (hasta '+D.last+')':'')+'</td><td>'+fmt(a,0)+'</td><td>'+fmt(b,0)+'</td><td>'+fmt(c,0)+'</td></tr>';
   document.getElementById('days5').innerHTML = tb + '</tbody></table>';
   return f;
 })();
@@ -609,6 +716,55 @@ draw();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
 
+// ---- day navigation (archived days live in dias/YYYY-MM-DD.html) ----
+(function(){
+  const home = D.archive ? '../' : './', dayUrl = iso => (D.archive ? '' : 'dias/') + iso + '.html';
+  const todayAR = new Date(Date.now() - 3*3600e3).toISOString().slice(0,10);
+  const pick = document.getElementById('dPick'), prev = document.getElementById('dPrev'), next = document.getElementById('dNext'),
+        msg = document.getElementById('dMsg'), toToday = document.getElementById('dToday');
+  pick.value = D.date; pick.max = todayAR;
+  toToday.href = home;
+  if (!D.archive) toToday.hidden = true;
+  const off = a => { a.setAttribute('aria-disabled','true'); a.removeAttribute('href'); };
+  off(prev); off(next);
+  let dates = [];
+  const go = iso => {
+    msg.hidden = true;
+    if (iso === todayAR) { location.href = home; return; }
+    if (dates.includes(iso)) { location.href = dayUrl(iso); return; }
+    msg.textContent = 'No hay datos guardados del ' + iso.split('-').reverse().join('/') +
+      (dates.length ? '. Hay días desde el ' + dates[0].split('-').reverse().join('/') + '.' : '.');
+    msg.hidden = false; pick.value = D.date;
+  };
+  pick.addEventListener('change', () => { if (pick.value) go(pick.value); });
+  fetch((D.archive ? '' : 'dias/') + 'index.json?t=' + Date.now(), {cache:'no-store'})
+    .then(r => r.ok ? r.json() : {dates:[]}).then(j => {
+      dates = (j.dates || []).filter(x => x !== todayAR);
+      if (dates.length) pick.min = dates[0];
+      const before = dates.filter(x => x < D.date), after = dates.filter(x => x > D.date);
+      if (before.length) { prev.href = dayUrl(before[before.length-1]); prev.removeAttribute('aria-disabled'); }
+      if (after.length) { next.href = dayUrl(after[0]); next.removeAttribute('aria-disabled'); }
+      else if (D.archive) { next.href = home; next.removeAttribute('aria-disabled'); }
+    }).catch(() => {});
+  // print / save as PDF: light colours, single-day chart, hourly table open
+  let saved = null;
+  const before = () => {
+    if (saved) return;
+    const tb = document.getElementById('tblBox');
+    saved = {mode5, open: tb.open, theme: document.documentElement.getAttribute('data-theme')};
+    PRINTING = true; document.documentElement.setAttribute('data-theme','light');
+    mode5 = false; document.getElementById('days5').hidden = true; tb.open = true; draw();
+  };
+  const after = () => {
+    if (!saved) return;
+    PRINTING = false;
+    if (saved.theme == null) document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', saved.theme);
+    document.getElementById('tblBox').open = saved.open; setMode(saved.mode5); draw(); saved = null;
+  };
+  addEventListener('beforeprint', before); addEventListener('afterprint', after);
+  document.getElementById('dPrint').addEventListener('click', () => { before(); setTimeout(() => window.print(), 50); });
+})();
+
 // ---- hourly table ----
 let t = '<thead><tr><th>Hora</th><th>Solar</th><th>Consumida en sitio</th><th>Desde la red</th><th>A la red</th><th>Consumo total</th></tr></thead><tbody>';
 // every hour with readings, including the hour still in progress, so the totals match the tiles
@@ -623,17 +779,19 @@ for (let h=0;h<nrows;h++){
 }
 t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(tsum.sol)+'</td><td>'+fmt(tsum.onsite)+'</td><td>'+fmt(tsum.grd)+'</td><td>'+fmt(tsum.inj)+'</td><td>'+fmt(tsum.use)+'</td></tr></tfoot>';
 document.getElementById('tbl').innerHTML = t;
-document.getElementById('tblSub').textContent = 'kWh por hora · hasta las '+D.last;
+document.getElementById('tblSub').textContent = 'kWh por hora · ' + (D.archive ? 'día completo' : 'hasta las '+D.last);
 { const tb = document.getElementById('tblBox');
   tb.addEventListener('toggle', () => { document.getElementById('tblLabel').textContent = tb.open ? 'Tabla por hora (abierta)' : 'Ver tabla por hora'; }); }
 
 document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
   'Página generada el '+D.built+' (hora de Argentina); se actualiza sola cada 5 minutos.';
 
+if (D.archive) document.getElementById('foot').innerHTML = 'Informe del '+dTxt+'. Energía en kWh y potencia en kW (promedio de cada 15 minutos), '+
+  'leídas de los medidores SMEC de la planta (AGRIM02P solar, DAGSR01P conexión a la red).';
 if (D.snapshot) document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
   '<b>Vista de prueba</b> con datos hasta las '+D.last+'. La versión definitiva se actualizará sola cada 15 minutos.';
 // refresh: reload every 5 minutes, bypassing stale copies
-if (!D.snapshot) setTimeout(() => { location.replace(location.pathname + '?t=' + Date.now()); }, 5*60*1000);
+if (!D.snapshot && !D.archive) setTimeout(() => { location.replace(location.pathname + '?t=' + Date.now()); }, 5*60*1000);
 </script>
 </body>
 </html>
