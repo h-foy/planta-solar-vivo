@@ -382,11 +382,11 @@ const lastKw = ns>0 ? D.sol[ns-1]*4 : 0;
 const solNote = ns < n ? (ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares todavía') : null;
 const upto = ns < n ? ' (hasta las '+(D.solLast||'00:00')+')' : '';
 const tiles = [
-  ['Producción solar', fmt(T.sol,0)+'<small>kWh</small>', solNote || ('Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
   ['Consumo total del sitio', fmt(ns<n ? W.use : T.use,0)+'<small>kWh</small>', ns<n ? 'hasta las '+(D.solLast||'00:00')+' (falta el dato solar)' : 'solar consumida + comprada a la red', null],
   ['Comprada a la red', fmt(T.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(W.grd,W.use)+upto, '--grid-in'],
-  ['Inyectada a la red', fmt(T.inj,0)+'<small>kWh</small>', pct(W.inj,W.sol)+' de la producción solar'+upto, '--inject'],
   ['Solar consumida en sitio', fmt(T.onsite,0)+'<small>kWh</small>', solNote || ('Autoconsumo '+pct(T.onsite,T.sol)), '--onsite'],
+  ['Producción solar', fmt(T.sol,0)+'<small>kWh</small>', solNote || ('Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
+  ['Inyectada a la red', fmt(T.inj,0)+'<small>kWh</small>', pct(W.inj,W.sol)+' de la producción solar'+upto, '--inject'],
   ['Cobertura solar', pct(W.onsite,W.use), 'del consumo cubierto por solar'+upto, null],
 ];
 document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c]) =>
