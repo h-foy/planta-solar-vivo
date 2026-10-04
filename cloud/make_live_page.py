@@ -23,6 +23,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from parse import parse  # noqa: E402
+from make_excel import build_month_workbooks  # noqa: E402
 
 PAT = re.compile(r'(AGRIM02P|DAGSR01P)_(\d{8})(?:_hasta_(\d{4}))?\.PRN$', re.I)
 
@@ -213,6 +214,7 @@ def build_day_pages(dirs, dest):
     dates = [f'{d[:4]}-{d[4:6]}-{d[6:]}' for d in sorted(days)]
     write_if_changed(os.path.join(out_dir, 'index.json'), json.dumps({'dates': dates}, separators=(',', ':')))
     print(f'day pages: {len(dates)} days archived, {written} page(s) written -> {out_dir}')
+    build_month_workbooks(days, parse, dest)
 
 
 TEMPLATE = r'''<!doctype html>
@@ -341,6 +343,7 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
 .daynav .btn:focus-visible,.daynav input:focus-visible{outline:2px solid var(--inject);outline-offset:1px}
 .daynav .lbl{font-size:13px;color:var(--ink2)}
 .daynav .print{margin-left:auto}
+.daynav [hidden]{display:none !important}
 .daynav .msg3{flex-basis:100%;font-size:12px;color:var(--warn-ink)}
 @media print{
   @page{size:A4 portrait;margin:11mm}
@@ -376,6 +379,7 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
       <a class="btn" id="dNext" href="#" aria-label="Día siguiente">&#9654;</a>
       <a class="btn" id="dToday" href="#">Hoy en vivo</a>
       <button class="btn print" id="dPrint" type="button">&#128438; Imprimir / PDF</button>
+      <a class="btn xls" id="dXls" href="#" download hidden>&#11015; Excel del mes</a>
       <span class="msg3" id="dMsg" hidden></span>
     </nav>
   </header>
@@ -781,6 +785,21 @@ let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(dra
   };
   addEventListener('beforeprint', before); addEventListener('afterprint', after);
   document.getElementById('dPrint').addEventListener('click', () => { before(); setTimeout(() => window.print(), 50); });
+  // monthly Excel (excel/YYYY-MM.xlsx: daily summary + every 15-minute reading of the complete days)
+  { const xls = document.getElementById('dXls'), xdir = (D.archive ? '../' : '') + 'excel/';
+    const mes = iso => new Date(iso+'T12:00:00').toLocaleDateString('es-AR',{month:'short',year:'numeric'}).replace('.','');
+    fetch(xdir + 'index.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.json() : {}).then(j => {
+      const meses = j.meses || {}; let ym = D.date.slice(0,7);
+      if (!meses[ym]) {                       // e.g. the 1st of the month: no complete day yet, offer last month
+        const prior = Object.keys(meses).filter(k => k < ym).sort(); if (!prior.length) return; ym = prior[prior.length-1]; }
+      const m = meses[ym];
+      xls.href = xdir + ym + '.xlsx?v=' + m.hasta;
+      xls.setAttribute('download', 'Planta solar ' + ym + '.xlsx');
+      xls.innerHTML = '&#11015; Excel ' + mes(ym + '-15');
+      xls.title = 'Resumen diario y lecturas cada 15 minutos de ' + mes(ym + '-15') + ' (' + m.dias + ' días completos, hasta el ' +
+        m.hasta.split('-').reverse().join('/') + ')';
+      xls.hidden = false;
+    }).catch(() => {}); }
 })();
 
 // ---- hourly table ----
