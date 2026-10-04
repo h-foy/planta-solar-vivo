@@ -602,9 +602,17 @@ let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(dra
 
 // ---- hourly table ----
 let t = '<thead><tr><th>Hora</th><th>Solar</th><th>Consumida en sitio</th><th>Desde la red</th><th>A la red</th><th>Consumo total</th></tr></thead><tbody>';
-for (let h=0;h<nh;h++) t += '<tr><td>'+hhmm(h*60)+'</td><td>'+fmt(H.sol[h])+'</td><td>'+fmt(H.onsite[h])+'</td><td>'+fmt(H.grd[h])+'</td><td>'+fmt(H.inj[h])+'</td><td>'+(H.onsite[h]==null ? '–' : fmt(H.onsite[h]+H.grd[h]))+'</td></tr>';
-const hs = k => sum(H[k].slice(0,nh));
-t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(hs('sol'))+'</td><td>'+fmt(hs('onsite'))+'</td><td>'+fmt(hs('grd'))+'</td><td>'+fmt(hs('inj'))+'</td><td>'+fmt(hs('onsite')+hs('grd'))+'</td></tr></tfoot>';
+// every hour with readings, including the hour still in progress, so the totals match the tiles
+const nrows = Math.ceil(n/4), tsum = {sol:0, onsite:0, grd:0, inj:0, use:0};
+const hsum = (k,h) => { const v = q[k].slice(h*4, h*4+4).filter(x => x!=null); return v.length ? v.reduce((a,b)=>a+b,0) : null; };
+for (let h=0;h<nrows;h++){
+  const r = {sol:hsum('sol',h), onsite:hsum('onsite',h), grd:hsum('grd',h), inj:hsum('inj',h)};
+  r.use = r.onsite==null || r.grd==null ? null : r.onsite + r.grd;
+  for (const k in tsum) tsum[k] += r[k] || 0;
+  const partial = (h+1)*4 > n;
+  t += '<tr><td>'+hhmm(h*60)+(partial ? ' <small>(hasta '+D.last+')</small>' : '')+'</td><td>'+fmt(r.sol)+'</td><td>'+fmt(r.onsite)+'</td><td>'+fmt(r.grd)+'</td><td>'+fmt(r.inj)+'</td><td>'+fmt(r.use)+'</td></tr>';
+}
+t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(tsum.sol)+'</td><td>'+fmt(tsum.onsite)+'</td><td>'+fmt(tsum.grd)+'</td><td>'+fmt(tsum.inj)+'</td><td>'+fmt(tsum.use)+'</td></tr></tfoot>';
 document.getElementById('tbl').innerHTML = t;
 
 document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
