@@ -487,13 +487,31 @@ const lastKw = ns>0 ? D.sol[ns-1]*4 : 0;
 const peakI = D.sol.reduce((b,v,i,a) => v > a[b] ? i : b, 0), peakKw = (D.sol[peakI]||0)*4;
 const solNote = ns < n ? (ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares todavía') : null;
 const upto = ns < n ? ' (hasta las '+(D.solLast||'00:00')+')' : '';
+// Round the measured totals once, then build the derived ones from those rounded numbers,
+// so what is shown always adds up: consumo = comprada + consumida, producción = consumida + inyectada.
+const rset = X => { const r = {sol:Math.round(X.sol), grd:Math.round(X.grd), inj:Math.round(X.inj)};
+  r.onsite = Math.abs((X.sol - X.inj) - X.onsite) < 0.5 ? r.sol - r.inj : Math.round(X.onsite);   // (clipped intervals: keep the real value)
+  r.use = r.onsite + r.grd; return r; };
+// hourly rows in tenths of kWh (whole numbers, so sums are exact); the tiles use these same totals
+const HR = [], TT = {sol:0, onsite:0, grd:0, inj:0, use:0};
+{ const hsum = (k,h) => { const v = q[k].slice(h*4, h*4+4).filter(x => x!=null); return v.length ? v.reduce((a,b)=>a+b,0) : null; };
+  const t10 = v => v==null ? null : Math.round(v*10);
+  for (let h=0; h<Math.ceil(n/4); h++){
+    const x = {sol:hsum('sol',h), onsite:hsum('onsite',h), grd:hsum('grd',h), inj:hsum('inj',h)};
+    const r = {sol:t10(x.sol), grd:t10(x.grd), inj:t10(x.inj)};
+    r.onsite = x.onsite==null ? null : (Math.abs((x.sol - x.inj) - x.onsite) < 0.05 ? r.sol - r.inj : t10(x.onsite));
+    r.use = r.onsite==null || r.grd==null ? null : r.onsite + r.grd;
+    HR.push(r); for (const k in TT) TT[k] += r[k] || 0;
+  }
+  for (const k in TT) TT[k] /= 10; }
+const RT = rset(TT), RW = ns<n ? rset(W) : RT;
 const tiles = [
-  ['Consumo total del sitio', fmt(ns<n ? W.use : T.use,0)+'<small>kWh</small>', ns<n ? 'hasta las '+(D.solLast||'00:00')+' (falta el dato solar)' : 'solar consumida + comprada a la red', null],
-  ['Comprada a la red', fmt(T.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(W.grd,W.use)+upto, '--grid-in'],
-  ['Solar consumida en sitio', fmt(T.onsite,0)+'<small>kWh</small>', solNote || ('Autoconsumo '+pct(T.onsite,T.sol)), '--onsite'],
-  ['Producción solar', fmt(T.sol,0)+'<small>kWh</small>', solNote || (D.archive ? 'Pico '+fmt(peakKw,0)+' kW a las '+hhmm(peakI*15+15) : 'Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
-  ['Inyectada a la red', fmt(T.inj,0)+'<small>kWh</small>', pct(W.inj,W.sol)+' de la producción solar'+upto, '--inject'],
-  ['Cobertura solar', pct(W.onsite,W.use), 'del consumo cubierto por solar'+upto, null],
+  ['Consumo total del sitio', fmt(ns<n ? RW.use : RT.use,0)+'<small>kWh</small>', ns<n ? 'hasta las '+(D.solLast||'00:00')+' (falta el dato solar)' : 'solar consumida + comprada a la red', null],
+  ['Comprada a la red', fmt(RT.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(RW.grd,RW.use)+upto, '--grid-in'],
+  ['Solar consumida en sitio', fmt(RT.onsite,0)+'<small>kWh</small>', solNote || ('Autoconsumo '+pct(RT.onsite,RT.sol)), '--onsite'],
+  ['Producción solar', fmt(RT.sol,0)+'<small>kWh</small>', solNote || (D.archive ? 'Pico '+fmt(peakKw,0)+' kW a las '+hhmm(peakI*15+15) : 'Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
+  ['Inyectada a la red', fmt(RT.inj,0)+'<small>kWh</small>', pct(RW.inj,RW.sol)+' de la producción solar'+upto, '--inject'],
+  ['Cobertura solar', pct(RW.onsite,RW.use), 'del consumo cubierto por solar'+upto, null],
 ];
 document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c]) =>
   '<div class="tile"><div class="k">'+(c?'<span class="sw" style="background:var('+c+')"></span>':'')+k+
@@ -767,16 +785,13 @@ let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(dra
 
 // ---- hourly table ----
 let t = '<thead><tr><th>Hora</th><th>Solar</th><th>Consumida en sitio</th><th>Desde la red</th><th>A la red</th><th>Consumo total</th></tr></thead><tbody>';
-// every hour with readings, including the hour still in progress, so the totals match the tiles
-const nrows = Math.ceil(n/4), tsum = {sol:0, onsite:0, grd:0, inj:0, use:0};
-const hsum = (k,h) => { const v = q[k].slice(h*4, h*4+4).filter(x => x!=null); return v.length ? v.reduce((a,b)=>a+b,0) : null; };
-for (let h=0;h<nrows;h++){
-  const r = {sol:hsum('sol',h), onsite:hsum('onsite',h), grd:hsum('grd',h), inj:hsum('inj',h)};
-  r.use = r.onsite==null || r.grd==null ? null : r.onsite + r.grd;
-  for (const k in tsum) tsum[k] += r[k] || 0;
+// every hour with readings (HR, built above), including the hour still in progress
+for (let h=0;h<HR.length;h++){
+  const r = {}; for (const k in HR[h]) r[k] = HR[h][k]==null ? null : HR[h][k]/10;
   const partial = (h+1)*4 > n;
   t += '<tr><td>'+hhmm(h*60)+(partial ? ' <small>(hasta '+D.last+')</small>' : '')+'</td><td>'+fmt(r.sol)+'</td><td>'+fmt(r.onsite)+'</td><td>'+fmt(r.grd)+'</td><td>'+fmt(r.inj)+'</td><td>'+fmt(r.use)+'</td></tr>';
 }
+const tsum = TT;
 t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(tsum.sol)+'</td><td>'+fmt(tsum.onsite)+'</td><td>'+fmt(tsum.grd)+'</td><td>'+fmt(tsum.inj)+'</td><td>'+fmt(tsum.use)+'</td></tr></tfoot>';
 document.getElementById('tbl').innerHTML = t;
 document.getElementById('tblSub').textContent = 'kWh por hora · ' + (D.archive ? 'día completo' : 'hasta las '+D.last);
