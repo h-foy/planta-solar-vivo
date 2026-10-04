@@ -255,6 +255,15 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .days td.today{font-weight:600}
 details{margin:12px 0}
 summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 2px}
+/* hourly table: closed state looks like the camera button */
+details.tblbox>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);font-weight:600;font-size:inherit}
+details.tblbox>summary::-webkit-details-marker{display:none}
+details.tblbox>summary:hover{border-color:var(--axis)}
+details.tblbox>summary:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
+details.tblbox .play{width:26px;height:26px;border-radius:50%;background:var(--inject);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+details.tblbox .sub2{margin-left:auto;font-weight:400;font-size:12px;color:var(--ink2)}
+details.tblbox .box{margin-top:8px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:8px}
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
 th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--rule)}
 th:first-child,td:first-child{text-align:left}
@@ -303,9 +312,9 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
   <section class="tiles" id="tiles" aria-label="Hoy hasta ahora"></section>
 
 
-  <details>
-    <summary>Tabla por hora</summary>
-    <table id="tbl"></table>
+  <details class="tblbox" id="tblBox">
+    <summary><span class="play" aria-hidden="true">&#9776;</span><span id="tblLabel">Ver tabla por hora</span><span class="sub2" id="tblSub">kWh por hora</span></summary>
+    <div class="box"><table id="tbl"></table></div>
   </details>
 
   <footer id="foot"></footer>
@@ -614,6 +623,9 @@ for (let h=0;h<nrows;h++){
 }
 t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(tsum.sol)+'</td><td>'+fmt(tsum.onsite)+'</td><td>'+fmt(tsum.grd)+'</td><td>'+fmt(tsum.inj)+'</td><td>'+fmt(tsum.use)+'</td></tr></tfoot>';
 document.getElementById('tbl').innerHTML = t;
+document.getElementById('tblSub').textContent = 'kWh por hora · hasta las '+D.last;
+{ const tb = document.getElementById('tblBox');
+  tb.addEventListener('toggle', () => { document.getElementById('tblLabel').textContent = tb.open ? 'Tabla por hora (abierta)' : 'Ver tabla por hora'; }); }
 
 document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
   'Página generada el '+D.built+' (hora de Argentina); se actualiza sola cada 5 minutos.';
