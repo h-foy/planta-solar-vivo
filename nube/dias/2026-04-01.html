@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Planta Solar en Vivo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23F39C12'/%3E%3Cg stroke='%23F39C12' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M16 2v4M16 26v4M2 16h4M26 16h4M6 6l3 3M23 23l3 3M6 26l3-3M23 9l3-3'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f3ef; --card:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --ink3:#7a7974;
+  --rule:#e4e2dc; --grid:#ecebe6; --axis:#b9b7b0;
+  --solar:#F39C12; --onsite:#2ECC71; --grid-in:#E74C3C; --inject:#2980B9;
+  --warn-bg:#fff4e0; --warn-ink:#7a4a00;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121211; --card:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --ink3:#8f8e86;
+    --rule:#2c2c2a; --grid:#262624; --axis:#4a4945;
+    --solar:#F5A623; --onsite:#34D17A; --grid-in:#EE5A4C; --inject:#3D93CC;
+    --warn-bg:#3a2a0c; --warn-ink:#ffd58a;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121211; --card:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --ink3:#8f8e86;
+  --rule:#2c2c2a; --grid:#262624; --axis:#4a4945;
+  --solar:#F5A623; --onsite:#34D17A; --grid-in:#EE5A4C; --inject:#3D93CC;
+  --warn-bg:#3a2a0c; --warn-ink:#ffd58a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%}
+body{min-height:100vh}
+main{max-width:760px;margin:0 auto;padding:16px 16px 40px}
+header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
+.sub{color:var(--ink2);font-size:14px}
+.sub b{color:var(--ink);font-weight:600}
+.stale{display:none;margin:12px 0 0;padding:10px 12px;border-radius:10px;background:var(--warn-bg);
+  color:var(--warn-ink);font-size:14px;gap:8px;align-items:flex-start}
+.stale.on{display:flex}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0}
+@media (min-width:560px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:12px}
+.tile .k{font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:6px}
+.tile .v{font-size:22px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:13px;font-weight:500;color:var(--ink2);margin-left:3px}
+.tile .d{font-size:12px;color:var(--ink3);margin-top:2px}
+.sw{width:10px;height:10px;border-radius:3px;flex:none}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:14px 12px 10px;margin:12px 0}
+.card h2{font-size:15px;margin:0 2px 2px}
+.card .note{font-size:12px;color:var(--ink2);margin:0 2px 8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink2);margin:2px 2px 8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend .ln{width:14px;height:3px;border-radius:2px;background:var(--solar)}
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--card);color:var(--ink);border:1px solid var(--rule);
+  border-radius:10px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.14);
+  white-space:nowrap;display:none;z-index:2;font-variant-numeric:tabular-nums}
+.tip b{display:block;margin-bottom:3px}
+.tip div{display:flex;align-items:center;gap:6px}
+.tip div span:last-child{margin-left:auto;padding-left:12px}
+.cam{margin:12px 0}
+.cam .msg2{padding:30px 8px;text-align:center;color:var(--ink2);font-size:13px}
+.cam .row a{color:var(--ink2)}
+.cam button.open{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;text-align:left}
+.cam button.open:hover,.cam a.open:hover{border-color:var(--axis)}
+.cam a.open{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;box-sizing:border-box;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);font-weight:600;text-decoration:none}
+.cam a.open:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
+.cam button.open:focus-visible,.cam button.close:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
+.cam button.open[disabled]{cursor:default;color:var(--ink3);font-weight:500}
+.cam .play{width:26px;height:26px;border-radius:50%;background:var(--grid-in);color:#fff;display:grid;place-items:center;
+  font-size:11px;flex:none}
+.cam button[disabled] .play{background:var(--axis)}
+.cam .sub2{margin-left:auto;font-weight:400;font-size:12px;color:var(--ink2)}
+.cam .box{margin-top:8px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:8px}
+.cam .ratio{position:relative;width:100%;aspect-ratio:16/9;max-width:100%;background:#000;border-radius:8px;overflow:hidden}
+.cam iframe,.cam img{position:absolute;inset:0;width:100%;height:100%;border:0}
+.cam img{object-fit:contain}
+.cam .msg{position:absolute;inset:0;display:grid;place-items:center;color:#ccc;font-size:13px;padding:12px;text-align:center}
+.cam .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--ink2)}
+.cam button.close{border:1px solid var(--rule);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 2px}
+.hd h2{margin:0}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:9px;padding:2px;background:var(--bg)}
+.seg button{border:0;background:transparent;color:var(--ink2);font:inherit;font-size:13px;padding:5px 11px;border-radius:7px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg button:focus-visible{outline:2px solid var(--inject);outline-offset:1px}
+.seg button[disabled]{opacity:.45;cursor:default}
+.days{margin:10px 2px 4px}
+.days table{font-size:12px}
+.days td.today{font-weight:600}
+details{margin:12px 0}
+summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 2px}
+/* hourly table: closed state looks like the camera button */
+details.tblbox>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);font-weight:600;font-size:inherit}
+details.tblbox>summary::-webkit-details-marker{display:none}
+details.tblbox>summary:hover{border-color:var(--axis)}
+details.tblbox>summary:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
+details.tblbox .play{width:26px;height:26px;border-radius:50%;background:var(--inject);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+details.tblbox .sub2{margin-left:auto;font-weight:400;font-size:12px;color:var(--ink2)}
+details.tblbox .box{margin-top:8px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:8px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--rule)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ink);font-weight:700;font-size:12px}
+thead th{border-bottom:2px solid var(--ink)}
+tfoot td{font-weight:650}
+footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
+.daynav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 0}
+.daynav input[type=date]{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--rule);border-radius:9px;
+  background:var(--card);color:var(--ink)}
+.daynav .btn{font:inherit;font-size:13px;padding:6px 11px;border:1px solid var(--rule);border-radius:9px;background:var(--card);
+  color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.daynav .btn:hover{border-color:var(--axis)}
+.daynav .btn[aria-disabled="true"]{opacity:.4;pointer-events:none}
+.daynav .btn:focus-visible,.daynav input:focus-visible{outline:2px solid var(--inject);outline-offset:1px}
+.daynav .lbl{font-size:13px;color:var(--ink2)}
+.daynav .print{margin-left:auto}
+.daynav .msg3{flex-basis:100%;font-size:12px;color:var(--warn-ink)}
+@media print{
+  @page{size:A4 portrait;margin:11mm}
+  html,body{background:#fff !important;font-size:12px}
+  html,body{min-height:0 !important}
+  main{max-width:none;padding:0}
+  .daynav,.seg,#cam,.stale,.tip,details.tblbox>summary{display:none !important}
+  header h1{font-size:17px}
+  .card{border-color:#ccc;padding:6px 8px 2px;margin:6px 0;break-inside:avoid}
+  .card .note{display:none}
+  .tiles{grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:6px;margin:8px 0;break-inside:avoid}
+  .tile{padding:6px 8px;border-color:#ccc}
+  .tile .v{font-size:16px;margin-top:1px}
+  details.tblbox{margin:6px 0}
+  details.tblbox .box{border:0;padding:0;margin:0}
+  table{font-size:10px}
+  th,td{padding:1px 4px}
+  footer{margin-top:4px;font-size:9px}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Planta solar &middot; energía en vivo</h1>
+    <div class="sub" id="sub"></div>
+    <div class="stale" id="stale" role="status"><span aria-hidden="true">&#9888;</span><span id="staleText"></span></div>
+    <nav class="daynav" id="daynav" aria-label="Elegir día">
+      <a class="btn" id="dPrev" href="#" aria-label="Día anterior">&#9664;</a>
+      <label class="lbl" for="dPick">Ver día</label>
+      <input type="date" id="dPick">
+      <a class="btn" id="dNext" href="#" aria-label="Día siguiente">&#9654;</a>
+      <a class="btn" id="dToday" href="#">Hoy en vivo</a>
+      <button class="btn print" id="dPrint" type="button">&#128438; Imprimir / PDF</button>
+      <span class="msg3" id="dMsg" hidden></span>
+    </nav>
+  </header>
+
+  <section class="card">
+    <div class="hd">
+      <h2>SMEC · potencia cada 15 minutos</h2>
+      <div class="seg" role="group" aria-label="Período del gráfico">
+        <button type="button" id="segDay" aria-pressed="true">Hoy</button>
+        <button type="button" id="seg5" aria-pressed="false">5 días</button>
+      </div>
+    </div>
+    <p class="note" id="n15"></p>
+    <div class="legend" id="legend1"></div>
+    <div class="chart" id="c15"></div>
+    <div class="days" id="days5" hidden></div>
+  </section>
+
+  <section class="cam" id="cam" aria-label="Cámara de la planta">
+    <button class="open" id="camBtn" type="button" aria-expanded="false" aria-controls="camBox">
+      <span class="play" aria-hidden="true">&#9654;</span>
+      <span id="camLabel">Ver cámara en vivo</span>
+      <span class="sub2" id="camSub">Planta Agritur</span>
+    </button>
+    <div class="box" id="camBox" hidden>
+      <div class="ratio" id="camRatio"></div>
+      <div class="row"><span id="camNote">Video en vivo vía YouTube (sin sonido).</span>
+        <button class="close" id="camClose" type="button">&#10005; Cerrar</button></div>
+    </div>
+  </section>
+
+
+  <section class="tiles" id="tiles" aria-label="Hoy hasta ahora"></section>
+
+
+  <details class="tblbox" id="tblBox">
+    <summary><span class="play" aria-hidden="true">&#9776;</span><span id="tblLabel">Ver tabla por hora</span><span class="sub2" id="tblSub">kWh por hora</span></summary>
+    <div class="box"><table id="tbl"></table></div>
+  </details>
+
+  <footer id="foot"></footer>
+</main>
+
+<script>
+const D = {"date":"2026-04-01","n":96,"ns":96,"last":"24:00","solLast":"24:00","built":"","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.038,2.931,2.586,1.395,2.509,3.789,7.718,12.288,17.69,18.445,37.491,52.045,63.565,58.995,44.582,53.427,65.664,74.522,66.342,46.643,14.259,52.979,90.918,89.165,90.893,93.043,92.659,91.328,90.752,59.917,77.978,61.005,62.886,70.374,68.877,58.637,39.091,36.979,29.427,26.138,28.928,32.307,22.182,14.272,7.475,7.117,3.315,1.587,0.026,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.102,0.0,0.205,0.563,1.741,5.069,4.659,6.298,23.962,19.405,54.374,52.275,26.726,39.936,56.576,65.843,61.235,37.99,11.418,40.96,82.944,80.026,82.432,84.019,84.582,82.637,82.688,56.986,65.434,58.01,51.61,63.078,63.13,54.63,28.211,34.048,21.965,18.074,24.832,23.296,17.459,10.138,3.379,2.867,0.512,0.102,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[38.554,39.885,38.81,39.27,38.4,38.554,39.27,38.451,39.322,38.81,38.861,39.68,38.605,39.424,38.656,38.605,39.578,39.014,39.219,38.861,38.605,39.322,38.861,38.758,39.578,38.451,38.861,38.963,38.963,39.117,35.891,21.709,4.813,3.379,2.97,0.87,1.792,12.237,6.349,3.482,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.894,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.051,0.0,1.178,0.0,0.154,0.307,0.0,0.0,0.768,0.205,2.304,3.635,5.222,5.018,5.683,5.427,5.632,5.786,5.12,5.12,6.093,5.734,6.349,7.066,6.963,6.4,6.861,5.939,5.53,6.861,5.786],"snapshot":false,"archive":true,"cam":"","hist":[{"date":"2026-03-28","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.576,2.586,2.189,3.149,3.61,3.878,10.778,13.325,11.61,10.368,20.275,50.022,75.571,74.547,70.131,29.734,39.437,45.517,63.053,39.27,59.776,36.979,73.702,44.557,61.914,32.282,53.018,36.851,36.454,50.931,60.621,27.136,30.963,23.603,43.494,27.098,21.683,5.453,8.384,14.938,11.712,15.27,6.925,5.21,4.045,0.55,0.026,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,6.81,5.478,14.285,43.059,52.582,61.901,63.693,18.074,30.976,38.861,56.627,34.97,53.35,30.208,67.43,40.09,53.043,29.133,43.469,34.765,28.826,41.114,59.034,19.968,23.757,19.2,36.915,20.582,17.613,1.126,2.714,10.035,5.786,10.035,1.126,0.768,0.973,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[72.09,71.68,71.578,72.448,71.578,72.09,72.806,71.68,71.629,72.141,71.475,71.578,71.936,72.243,71.629,71.578,72.704,71.578,71.526,72.346,71.68,72.09,72.448,71.731,72.038,72.346,71.731,72.09,72.755,72.397,72.141,71.578,69.376,55.091,35.174,35.43,34.97,50.637,25.958,1.69,0.0,0.0,0.0,0.0,0.0,0.0,6.144,1.178,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.894,0.512,0.0,0.0,0.0,15.155,1.536,1.434,4.403,5.786,4.915,4.864,5.786,5.171,5.683,5.888,5.274,4.762,5.427,5.376,4.864,5.171,5.325,6.963,13.773,5.376,5.888,4.966]},{"date":"2026-03-29","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.141,0.96,4.685,11.712,18.509,26.317,25.203,41.062,34.944,48.038,60.966,57.139,65.382,52.506,75.699,45.824,33.766,34.112,41.549,39.744,48.371,50.765,52.045,55.322,46.182,60.134,48.461,58.47,32.538,42.586,36.685,36.365,37.939,33.702,38.349,43.546,32.115,47.078,29.85,44.902,36.941,18.714,22.49,7.283,4.147,2.33,0.474,0.09,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.768,6.502,13.21,20.224,15.36,18.483,30.566,42.496,54.989,50.739,60.723,48.589,65.843,43.469,29.747,27.392,34.918,29.696,39.424,47.206,45.005,48.845,39.475,54.528,39.987,53.35,24.422,37.632,29.44,30.31,31.386,28.109,32.205,37.53,26.163,40.755,23.654,37.376,32.87,14.336,17.459,2.714,0.819,0.154,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[5.888,5.12,5.12,5.53,5.12,5.786,5.632,5.53,4.864,4.864,5.632,4.966,5.222,5.99,4.813,4.966,5.222,5.274,5.069,5.069,5.939,5.018,4.813,5.683,4.813,4.813,5.632,5.222,5.325,5.222,4.506,4.147,2.304,0.0,0.0,0.0,1.126,1.843,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.717,2.304,4.301,5.53,5.478,5.888,5.12,5.99,6.451,5.376,5.683,4.915,4.506,5.99,5.683,5.581,6.605,5.274,5.53,4.966,5.222,5.99,5.069]},{"date":"2026-03-30","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.166,1.395,4.506,9.446,16.115,23.411,30.374,37.184,43.571,49.574,55.27,61.133,59.571,66.79,79.629,80.922,50.509,54.336,67.648,31.757,29.107,62.464,47.245,63.898,64.435,72.269,75.008,93.632,91.482,63.104,62.029,64.627,34.714,44.672,42.662,51.597,50.394,42.099,46.451,30.285,17.446,24.0,25.843,17.894,10.765,5.427,0.947,0.064,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.922,3.891,4.864,16.998,24.218,31.283,37.632,42.752,47.923,53.35,51.302,54.886,38.605,41.114,19.405,2.099,3.994,2.56,0.307,20.838,11.315,25.498,29.133,32.717,41.472,50.79,50.022,30.618,25.344,27.597,3.789,3.533,3.328,4.045,1.075,0.051,5.274,5.939,0.0,0.154,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[5.427,5.376,4.915,5.53,5.12,5.274,5.53,4.966,5.12,5.99,5.12,4.813,5.53,5.478,4.864,5.837,4.71,4.813,5.581,4.762,5.12,5.734,4.966,5.632,4.864,4.915,5.888,5.222,6.144,5.478,5.427,4.454,1.485,0.051,10.342,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.051,4.762,9.933,10.445,38.144,30.208,3.328,3.584,2.765,2.918,1.997,2.816,1.178,0.307,3.277,5.99,2.355,11.571,28.723,32.102,25.19,24.422,28.826,13.005,11.366,20.531,15.565,10.598,20.173,27.392,32.512,37.376,38.195,38.298,38.605,38.554,38.349,38.605,37.734,38.707,39.834,38.707,38.246,39.219,38.298,38.554,37.99,37.99,39.014,39.27,38.963]},{"date":"2026-03-31","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.154,1.357,5.146,10.739,17.51,24.845,30.656,35.328,40.755,43.942,45.888,50.304,61.888,66.368,72.845,77.709,71.91,83.75,78.963,87.245,58.304,66.381,54.643,50.867,81.574,86.694,90.086,80.346,84.915,92.006,91.123,86.438,75.725,65.088,76.8,68.838,60.941,58.522,51.904,35.904,22.515,24.781,22.208,19.392,9.306,3.84,0.627,0.013,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.205,0.87,3.533,5.734,8.602,13.466,14.899,15.718,4.608,28.006,23.654,17.306,21.914,49.357,47.002,46.234,43.059,51.302,51.2,46.49,37.939,28.211,35.994,29.645,23.859,18.278,12.954,4.096,1.178,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[39.168,39.168,38.656,38.502,38.656,38.195,38.093,38.605,38.042,38.144,38.246,37.99,38.246,38.195,37.939,38.656,38.502,38.093,38.81,37.837,37.581,38.298,37.376,37.427,38.451,38.451,37.99,38.554,37.939,37.939,38.042,36.915,32.717,27.494,44.186,46.336,39.885,34.816,30.822,27.443,23.194,22.272,11.059,6.4,2.406,0.768,8.96,2.355,8.755,7.578,28.621,9.677,7.987,8.653,3.789,1.28,2.816,2.253,2.867,0.0,0.0,0.0,1.075,3.584,0.0,0.41,1.229,1.536,1.382,7.68,16.998,16.742,17.664,20.07,29.798,34.97,39.475,39.885,40.448,39.987,39.219,39.987,39.475,40.294,39.68,40.141,39.629,39.424,39.987,39.68,40.448,39.424,40.09,38.81,39.27,38.605]}]};
+const S = [
+  {key:'grd',    name:'Comprada a la red',   css:'--grid-in'},
+  {key:'onsite', name:'Solar consumida en sitio', css:'--onsite'},
+  {key:'inj',    name:'Inyectada a la red',  css:'--inject'},
+  {key:'sol',    name:'Producción solar',    css:'--solar', line:true},
+];
+const col = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (x,d=1) => x==null ? '–' : x.toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const hhmm = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+
+// ---- derive series (null = no reading yet) ----
+const N = 96, n = D.n, ns = (D.ns==null ? n : D.ns);   // ns: intervals that also have solar data
+const q = {sol:[],inj:[],grd:[],onsite:[]};
+for (let i=0;i<N;i++){
+  const g = i<n ? D.grd[i] : null, j = i<n ? D.inj[i] : null, s = i<ns ? D.sol[i] : null;
+  q.grd.push(g); q.inj.push(j); q.sol.push(s); q.onsite.push(s==null ? null : Math.max(0, s-j));
+}
+const H = {sol:[],inj:[],grd:[],onsite:[]};
+const nh = Math.floor(n/4), nhs = Math.floor(ns/4);
+for (let h=0;h<24;h++) for (const k in H){
+  const ok = (k==='sol'||k==='onsite') ? h<nhs : h<nh;
+  H[k].push(ok ? q[k].slice(h*4,h*4+4).reduce((a,b)=>a+b,0) : null);
+}
+const sum = a => a.reduce((t,x)=>t+(x||0),0);
+const T = {sol:sum(q.sol), inj:sum(q.inj), grd:sum(q.grd), onsite:sum(q.onsite)};
+T.use = T.onsite + T.grd;
+// same sums but only over the stretch that has both meters (for honest ratios when solar data is behind)
+const W = {sol:sum(q.sol.slice(0,ns)), inj:sum(q.inj.slice(0,ns)), grd:sum(q.grd.slice(0,ns)), onsite:sum(q.onsite.slice(0,ns))};
+W.use = W.onsite + W.grd;
+
+// ---- header ----
+const dObj = new Date(D.date+'T12:00:00');
+const dTxt = dObj.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+document.getElementById('sub').innerHTML = dTxt + (D.archive ? ' &middot; <b>día completo</b>' : ' &middot; lecturas hasta las <b>'+D.last+'</b>');
+if (D.archive){
+  document.querySelector('header h1').textContent = 'Planta solar · informe del día';
+  document.title = 'Planta Solar · ' + D.date;
+  document.getElementById('segDay').textContent = 'Día';
+  document.getElementById('cam').hidden = true;
+}
+
+// stale check against Argentina time (UTC-3, no DST)
+(function(){
+  if (D.snapshot || D.archive) return;
+  const nowAR = new Date(Date.now() - 3*3600e3);
+  const todayAR = nowAR.toISOString().slice(0,10);
+  const minsNow = nowAR.getUTCHours()*60 + nowAR.getUTCMinutes();
+  const [lh,lm] = D.last.split(':').map(Number); const minsLast = lh*60+lm;
+  let msg = '';
+  if (D.date < todayAR) {
+    if (minsNow > 7*60+30) msg = 'Se muestra el '+dTxt+'. Todavía no llegaron lecturas de hoy.';
+  } else if (minsNow - minsLast > 50) {
+    msg = 'Sin lecturas nuevas desde las '+D.last+'. Puede haber un problema de conexión con los medidores; la página se pondrá al día sola.';
+  } else if (n - ns >= 2) {
+    msg = 'El medidor de la planta solar no responde'+(D.solLast ? ' desde las '+D.solLast : '')+
+          '. Se muestran los datos de la red al día; la parte solar se completará sola cuando vuelva la conexión.';
+  }
+  if (msg){ document.getElementById('staleText').textContent = msg; document.getElementById('stale').classList.add('on'); }
+})();
+
+// ---- tiles ----
+const pct = (a,b) => b>0 ? Math.round(a/b*100)+'%' : '–';
+const lastKw = ns>0 ? D.sol[ns-1]*4 : 0;
+const peakI = D.sol.reduce((b,v,i,a) => v > a[b] ? i : b, 0), peakKw = (D.sol[peakI]||0)*4;
+const solNote = ns < n ? (ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares todavía') : null;
+const upto = ns < n ? ' (hasta las '+(D.solLast||'00:00')+')' : '';
+// Round the measured totals once, then build the derived ones from those rounded numbers,
+// so what is shown always adds up: consumo = comprada + consumida, producción = consumida + inyectada.
+const rset = X => { const r = {sol:Math.round(X.sol), grd:Math.round(X.grd), inj:Math.round(X.inj)};
+  r.onsite = Math.abs((X.sol - X.inj) - X.onsite) < 0.5 ? r.sol - r.inj : Math.round(X.onsite);   // (clipped intervals: keep the real value)
+  r.use = r.onsite + r.grd; return r; };
+// hourly rows in tenths of kWh (whole numbers, so sums are exact); the tiles use these same totals
+const HR = [], TT = {sol:0, onsite:0, grd:0, inj:0, use:0};
+{ const hsum = (k,h) => { const v = q[k].slice(h*4, h*4+4).filter(x => x!=null); return v.length ? v.reduce((a,b)=>a+b,0) : null; };
+  const t10 = v => v==null ? null : Math.round(v*10);
+  for (let h=0; h<Math.ceil(n/4); h++){
+    const x = {sol:hsum('sol',h), onsite:hsum('onsite',h), grd:hsum('grd',h), inj:hsum('inj',h)};
+    const r = {sol:t10(x.sol), grd:t10(x.grd), inj:t10(x.inj)};
+    r.onsite = x.onsite==null ? null : (Math.abs((x.sol - x.inj) - x.onsite) < 0.05 ? r.sol - r.inj : t10(x.onsite));
+    r.use = r.onsite==null || r.grd==null ? null : r.onsite + r.grd;
+    HR.push(r); for (const k in TT) TT[k] += r[k] || 0;
+  }
+  for (const k in TT) TT[k] /= 10; }
+const RT = rset(TT), RW = ns<n ? rset(W) : RT;
+const tiles = [
+  ['Consumo total del sitio', fmt(ns<n ? RW.use : RT.use,0)+'<small>kWh</small>', ns<n ? 'hasta las '+(D.solLast||'00:00')+' (falta el dato solar)' : 'solar consumida + comprada a la red', null],
+  ['Comprada a la red', fmt(RT.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(RW.grd,RW.use)+upto, '--grid-in'],
+  ['Solar consumida en sitio', fmt(RT.onsite,0)+'<small>kWh</small>', solNote || ('Autoconsumo '+pct(RT.onsite,RT.sol)), '--onsite'],
+  ['Producción solar', fmt(RT.sol,0)+'<small>kWh</small>', solNote || (D.archive ? 'Pico '+fmt(peakKw,0)+' kW a las '+hhmm(peakI*15+15) : 'Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
+  ['Inyectada a la red', fmt(RT.inj,0)+'<small>kWh</small>', pct(RW.inj,RW.sol)+' de la producción solar'+upto, '--inject'],
+  ['Cobertura solar', pct(RW.onsite,RW.use), 'del consumo cubierto por solar'+upto, null],
+];
+document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c]) =>
+  '<div class="tile"><div class="k">'+(c?'<span class="sw" style="background:var('+c+')"></span>':'')+k+
+  '</div><div class="v">'+v+'</div><div class="d">'+d+'</div></div>').join('');
+
+// ---- legends ----
+const legendHTML = S.map(s => s.line
+  ? '<span><span class="ln"></span>'+s.name+'</span>'
+  : '<span><span class="sw" style="background:var('+s.css+')"></span>'+s.name+'</span>').join('');
+document.getElementById('legend1').innerHTML = legendHTML;
+
+// ---- chart ----
+let PRINTING = false;
+function niceStep(range, target){
+  const raw = range/target, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const m = raw/p; return (m<=1?1:m<=2?2:m<=2.5?2.5:m<=5?5:10)*p;
+}
+function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
+  opt = opt || {};
+  const box0 = document.getElementById(el);
+  const W = Math.max(300, Math.round(box0.clientWidth || 340));
+  const Hh = PRINTING ? Math.round(W*0.31) : Math.round(Math.min(320, Math.max(210, W*0.58))), pl = 34, pr = 6, pt = 10, pb = 24;
+  const iw = W-pl-pr, ih = Hh-pt-pb;
+  let up = 0, dn = 0;
+  for (let i=0;i<slots;i++){ up = Math.max(up,(d.onsite[i]||0)+(d.grd[i]||0), d.sol[i]||0); dn = Math.max(dn, d.inj[i]||0); }
+  if (up===0) up = 1;
+  const step = niceStep(up+dn, 5);
+  const top = Math.ceil(up/step)*step, bot = dn>0 ? Math.ceil(dn/step)*step : 0;
+  const y = v => pt + (top - v)/(top+bot)*ih;
+  const bw = iw/slots, gap = bw < 3 ? 0 : Math.max(1, Math.min(2, bw*0.18)), w = Math.max(.5, bw-gap);
+  const r = Math.min(4, w/2);
+  const unit = opt.unit || 'kWh';
+  let s = '<svg viewBox="0 0 '+W+' '+Hh+'" role="img" aria-label="'+(unit==='kW' ? 'Gráfico de potencia' : 'Gráfico de energía')+'">';
+  for (let v=-bot; v<=top+1e-9; v+=step){
+    const yy = y(v);
+    s += '<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+yy+'" y2="'+yy+'" stroke="'+(Math.abs(v)<1e-9?col('--axis'):col('--grid'))+'" stroke-width="1"/>';
+    s += '<text x="'+(pl-6)+'" y="'+(yy+4)+'" text-anchor="end" font-size="11" fill="'+col('--ink3')+'">'+fmt(Math.abs(v),0)+'</text>';
+  }
+  if (opt.ticks){
+    for (const [i,txt] of opt.ticks)
+      s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+txt+'</text>';
+    for (const i of (opt.seps||[]))
+      s += '<line x1="'+(pl+i*bw)+'" x2="'+(pl+i*bw)+'" y1="'+pt+'" y2="'+(pt+ih)+'" stroke="'+col('--axis')+'" stroke-width="1" stroke-dasharray="2 3"/>';
+  } else {
+    for (let i=0;i<slots;i+=labelEvery){
+      s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+labelFn(i)+'</text>';
+    }
+  }
+  const y0 = y(0);
+  // shade the stretch that has grid readings but no solar readings (solar meter not answering)
+  { let a0 = -1, a1 = -1;
+    for (let i=0;i<slots;i++){ if (d.sol[i]==null && d.grd[i]!=null){ if (a0<0) a0=i; a1=i; } }
+    if (a0>=0){ const xa = pl+a0*bw, xb = pl+(a1+1)*bw;
+      s += '<rect x="'+xa+'" y="'+pt+'" width="'+(xb-xa)+'" height="'+ih+'" fill="'+col('--ink3')+'" opacity="0.10"/>';
+      if (xb-xa > 60) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" fill="'+col('--ink2')+'">sin datos solares</text>'; } }
+  // rounded-end bar path: rounded at the far end only, anchored to the baseline
+  const bar = (x, y1, y2, c, roundTop) => {
+    const h = Math.abs(y2-y1); if (h < .5) return '';
+    const rr = Math.min(r, h/2);
+    if (roundTop){ const yt = Math.min(y1,y2), yb = Math.max(y1,y2);
+      return '<path fill="'+c+'" d="M'+x+','+yb+'V'+(yt+rr)+'Q'+x+','+yt+' '+(x+rr)+','+yt+'H'+(x+w-rr)+'Q'+(x+w)+','+yt+' '+(x+w)+','+(yt+rr)+'V'+yb+'Z"/>'; }
+    const yt = Math.min(y1,y2), yb = Math.max(y1,y2);
+    return '<path fill="'+c+'" d="M'+x+','+yt+'V'+(yb-rr)+'Q'+x+','+yb+' '+(x+rr)+','+yb+'H'+(x+w-rr)+'Q'+(x+w)+','+yb+' '+(x+w)+','+(yb-rr)+'V'+yt+'Z"/>';
+  };
+  const cOn = col('--onsite'), cG = col('--grid-in'), cI = col('--inject'), cS = col('--solar'), cCard = col('--card');
+  for (let i=0;i<slots;i++){
+    if (d.grd[i]==null && d.sol[i]==null) continue;
+    const x = pl + i*bw + gap/2;
+    const a = d.onsite[i]||0, g = d.grd[i]||0, j = d.inj[i]||0;
+    const yA = y(a), yAG = y(a+g);
+    if (a>0) s += bar(x, y0, yA, cOn, g<=0.0001);
+    if (g>0) s += bar(x, a>0 ? yA-1 : y0, yAG, cG, true);   // 1px surface gap between stacked fills
+    if (j>0) s += bar(x, y0, y(-j), cI, false);
+  }
+  // solar line
+  let p = '', pts = [], segs = [];
+  for (let i=0;i<slots;i++){
+    if (d.sol[i]==null){ if (pts.length) segs.push(pts); pts = []; continue; }
+    pts.push([pl+i*bw+bw/2, y(d.sol[i])]);
+  }
+  if (pts.length) segs.push(pts);
+  pts = segs.length ? segs[segs.length-1] : [];
+  if (pts.length){ p = segs.map(sg => 'M'+sg.map(t=>t[0].toFixed(1)+','+t[1].toFixed(1)).join('L')).join('');
+    s += '<path d="'+p+'" fill="none" stroke="'+cCard+'" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>';
+    s += '<path d="'+p+'" fill="none" stroke="'+cS+'" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>';
+    const lp = pts[pts.length-1];
+    s += '<circle cx="'+lp[0]+'" cy="'+lp[1]+'" r="4.5" fill="'+cS+'" stroke="'+cCard+'" stroke-width="2"/>';
+  }
+  s += '<line id="'+el+'x" x1="0" x2="0" y1="'+pt+'" y2="'+(pt+ih)+'" stroke="'+col('--ink3')+'" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>';
+  s += '<rect x="'+pl+'" y="0" width="'+iw+'" height="'+Hh+'" fill="transparent" id="'+el+'hit"/>';
+  s += '</svg><div class="tip" id="'+el+'tip"></div>';
+  const box = document.getElementById(el); box.innerHTML = s;
+  // hover / tap tooltip
+  const svg = box.querySelector('svg'), tip = document.getElementById(el+'tip'), xl = document.getElementById(el+'x');
+  const show = ev => {
+    const pt0 = ev.touches ? ev.touches[0] : ev; const rc = svg.getBoundingClientRect();
+    const sx = (pt0.clientX - rc.left) / rc.width * W;
+    let i = Math.floor((sx-pl)/bw); i = Math.max(0, Math.min(slots-1, i));
+    if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
+    const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible');
+    const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
+    tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
+                    row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i]);
+    tip.style.display = 'block';
+    const px = cx/W*rc.width, tw = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(rc.width - tw, px - tw/2)) + 'px';
+    tip.style.top = '-6px'; tip.style.transform = 'translateY(-100%)';
+  };
+  const hide = () => { tip.style.display='none'; xl.setAttribute('visibility','hidden'); };
+  svg.addEventListener('mousemove', show); svg.addEventListener('mouseleave', hide);
+  svg.addEventListener('touchstart', show, {passive:true}); svg.addEventListener('touchmove', show, {passive:true});
+  document.addEventListener('touchstart', e => { if (!box.contains(e.target)) hide(); }, {passive:true});
+}
+// ---- 5-day view: previous 4 days + today, every 15 minutes, in kW (kWh x 4) ----
+const dname = iso => { const t = new Date(iso+'T12:00:00');
+  return t.toLocaleDateString('es-AR',{weekday:'short'}).replace('.','')+' '+t.getDate(); };
+const F = (function(){
+  const hist = D.hist || [];
+  if (!hist.length) return null;
+  const f = {sol:[],inj:[],grd:[],onsite:[],ticks:[],seps:[],lab:[]};
+  const add = (iso, sol, inj, grd) => {
+    const base = f.sol.length;
+    if (base) f.seps.push(base);
+    f.ticks.push([base+48, dname(iso)]);
+    const k4 = v => v==null ? null : v*4;
+    for (let i=0;i<96;i++){
+      const s0 = k4(sol[i]), j = k4(inj[i]), g = k4(grd[i]);
+      f.sol.push(s0); f.inj.push(j); f.grd.push(g);
+      f.onsite.push(s0==null ? null : Math.max(0, s0-(j||0)));
+      f.lab.push([iso,i]);
+    }
+  };
+  for (const d of hist) add(d.date, d.sol, d.inj, d.grd);
+  add(D.date, q.sol, q.inj, q.grd);
+  f.tip = i => { const [iso,h] = f.lab[i]; const t = new Date(iso+'T12:00:00');
+    return t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'numeric'}).replace('.','')+' · '+hhmm(h*15)+'–'+hhmm(h*15+15); };
+  // per-day totals
+  const tot = a => a.reduce((t,x)=>t+(x||0),0);
+  const rows = hist.map(d => [d.date, tot(d.sol), tot(d.grd), tot(d.inj), false]);
+  rows.push([D.date, T.sol, T.grd, T.inj, true]);
+  let tb = '<table><thead><tr><th>Día</th><th>Solar</th><th>Comprada a la red</th><th>Inyectada</th></tr></thead><tbody>';
+  for (const [iso,a,b,c,today] of rows)
+    tb += '<tr><td'+(today?' class="today"':'')+'>'+dname(iso)+(today && !D.archive ?' (hasta '+D.last+')':'')+'</td><td>'+fmt(a,0)+'</td><td>'+fmt(b,0)+'</td><td>'+fmt(c,0)+'</td></tr>';
+  document.getElementById('days5').innerHTML = tb + '</tbody></table>';
+  return f;
+})();
+let mode5 = false;
+try { mode5 = localStorage.getItem('vista60') === '5d'; } catch(e) {}
+function setMode(five){
+  mode5 = !!(five && F);
+  document.getElementById('segDay').setAttribute('aria-pressed', String(!mode5));
+  document.getElementById('seg5').setAttribute('aria-pressed', String(mode5));
+  document.getElementById('n15').innerHTML = mode5
+    ? 'Últimos 5 días: los 4 días anteriores y hoy hasta la última lectura, en kW promedio de cada 15 minutos. Totales por día (kWh) debajo del gráfico.'
+    : 'kW promedio de cada intervalo de 15 minutos (kWh del medidor &times; 4). Barras sobre la línea: lo que consumió el sitio. Debajo de la línea: solar inyectada a la red.';
+  document.getElementById('days5').hidden = !mode5;
+  try { localStorage.setItem('vista60', mode5 ? '5d' : 'hoy'); } catch(e) {}
+}
+if (!F){ const b = document.getElementById('seg5'); b.disabled = true; b.title = 'Todavía no hay días anteriores guardados'; }
+document.getElementById('segDay').addEventListener('click', () => { setMode(false); draw(); });
+document.getElementById('seg5').addEventListener('click', () => { setMode(true); draw(); });
+setMode(mode5);
+
+// 15-minute chart in kW: average power of each interval = kWh x 4
+const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
+function draw(){
+  if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps, unit:'kW'});
+  else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15), {unit:'kW'});
+}
+draw();
+
+// ---- live camera (loads only when opened) ----
+(function(){
+  const btn = document.getElementById('camBtn'), box = document.getElementById('camBox'),
+        ratio = document.getElementById('camRatio');
+  if (!D.cam) {
+    btn.disabled = true;
+    document.getElementById('camLabel').textContent = 'Cámara en vivo: próximamente';
+    return;
+  }
+  const photo = /\.(jpe?g|png)(\?.*)?$/i.test(D.cam);
+  const idle = photo ? 'Ver foto de la cámara' : 'Ver cámara en vivo';
+  document.getElementById('camLabel').textContent = idle;
+  if (photo) {
+    document.getElementById('camSub').textContent = 'Planta Agritur · cada 15 min';
+    document.getElementById('camNote').textContent = 'Última foto de la cámara (se actualiza cada 15 minutos).';
+  }
+  let timer = null;
+  const loadPhoto = () => {
+    const sep = D.cam.includes('?') ? '&' : '?';
+    const img = new Image();
+    img.alt = 'Última foto de la cámara de la planta';
+    img.onload = () => { ratio.innerHTML = ''; ratio.appendChild(img); };
+    img.onerror = () => { if (!ratio.querySelector('img'))
+      ratio.innerHTML = '<div class="msg">La foto todavía no está disponible. Probá de nuevo en unos minutos.</div>'; };
+    img.src = D.cam + sep + 't=' + Date.now();     // skip any cached copy
+  };
+  const open = () => {
+    if (photo) {
+      ratio.innerHTML = '<div class="msg">Cargando foto…</div>';
+      loadPhoto(); timer = setInterval(loadPhoto, 60000);
+    } else {
+      const sep = D.cam.includes('?') ? '&' : '?';
+      ratio.innerHTML = '<iframe src="' + D.cam + sep + 'autoplay=1&mute=1&playsinline=1&rel=0" title="Cámara de la planta en vivo" ' +
+        'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    }
+    box.hidden = false; btn.setAttribute('aria-expanded','true');
+    document.getElementById('camLabel').textContent = photo ? 'Foto de la cámara (abierta)' : 'Cámara en vivo (abierta)';
+  };
+  const close = () => {
+    clearInterval(timer); timer = null;
+    ratio.innerHTML = '';                       // stops the video and its data use
+    box.hidden = true; btn.setAttribute('aria-expanded','false');
+    document.getElementById('camLabel').textContent = idle;
+  };
+  btn.addEventListener('click', () => box.hidden ? open() : close());
+  document.getElementById('camClose').addEventListener('click', () => { close(); btn.focus(); });
+})();
+
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
+
+// ---- day navigation (archived days live in dias/YYYY-MM-DD.html) ----
+(function(){
+  const home = D.archive ? '../' : './', dayUrl = iso => (D.archive ? '' : 'dias/') + iso + '.html';
+  const todayAR = new Date(Date.now() - 3*3600e3).toISOString().slice(0,10);
+  const pick = document.getElementById('dPick'), prev = document.getElementById('dPrev'), next = document.getElementById('dNext'),
+        msg = document.getElementById('dMsg'), toToday = document.getElementById('dToday');
+  pick.value = D.date; pick.max = todayAR;
+  toToday.href = home;
+  if (!D.archive) toToday.hidden = true;
+  const off = a => { a.setAttribute('aria-disabled','true'); a.removeAttribute('href'); };
+  off(prev); off(next);
+  let dates = [];
+  const go = iso => {
+    msg.hidden = true;
+    if (iso === todayAR) { location.href = home; return; }
+    if (dates.includes(iso)) { location.href = dayUrl(iso); return; }
+    msg.textContent = 'No hay datos guardados del ' + iso.split('-').reverse().join('/') +
+      (dates.length ? '. Hay días desde el ' + dates[0].split('-').reverse().join('/') + '.' : '.');
+    msg.hidden = false; pick.value = D.date;
+  };
+  pick.addEventListener('change', () => { if (pick.value) go(pick.value); });
+  fetch((D.archive ? '' : 'dias/') + 'index.json?t=' + Date.now(), {cache:'no-store'})
+    .then(r => r.ok ? r.json() : {dates:[]}).then(j => {
+      dates = (j.dates || []).filter(x => x !== todayAR);
+      if (dates.length) pick.min = dates[0];
+      const before = dates.filter(x => x < D.date), after = dates.filter(x => x > D.date);
+      if (before.length) { prev.href = dayUrl(before[before.length-1]); prev.removeAttribute('aria-disabled'); }
+      if (after.length) { next.href = dayUrl(after[0]); next.removeAttribute('aria-disabled'); }
+      else if (D.archive) { next.href = home; next.removeAttribute('aria-disabled'); }
+    }).catch(() => {});
+  // print / save as PDF: light colours, single-day chart, hourly table open
+  let saved = null;
+  const before = () => {
+    if (saved) return;
+    const tb = document.getElementById('tblBox');
+    saved = {mode5, open: tb.open, theme: document.documentElement.getAttribute('data-theme')};
+    PRINTING = true; document.documentElement.setAttribute('data-theme','light');
+    mode5 = false; document.getElementById('days5').hidden = true; tb.open = true; draw();
+  };
+  const after = () => {
+    if (!saved) return;
+    PRINTING = false;
+    if (saved.theme == null) document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', saved.theme);
+    document.getElementById('tblBox').open = saved.open; setMode(saved.mode5); draw(); saved = null;
+  };
+  addEventListener('beforeprint', before); addEventListener('afterprint', after);
+  document.getElementById('dPrint').addEventListener('click', () => { before(); setTimeout(() => window.print(), 50); });
+})();
+
+// ---- hourly table ----
+let t = '<thead><tr><th>Hora</th><th>Solar</th><th>Consumida en sitio</th><th>Desde la red</th><th>A la red</th><th>Consumo total</th></tr></thead><tbody>';
+// every hour with readings (HR, built above), including the hour still in progress
+for (let h=0;h<HR.length;h++){
+  const r = {}; for (const k in HR[h]) r[k] = HR[h][k]==null ? null : HR[h][k]/10;
+  const partial = (h+1)*4 > n;
+  t += '<tr><td>'+hhmm(h*60)+(partial ? ' <small>(hasta '+D.last+')</small>' : '')+'</td><td>'+fmt(r.sol)+'</td><td>'+fmt(r.onsite)+'</td><td>'+fmt(r.grd)+'</td><td>'+fmt(r.inj)+'</td><td>'+fmt(r.use)+'</td></tr>';
+}
+const tsum = TT;
+t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(tsum.sol)+'</td><td>'+fmt(tsum.onsite)+'</td><td>'+fmt(tsum.grd)+'</td><td>'+fmt(tsum.inj)+'</td><td>'+fmt(tsum.use)+'</td></tr></tfoot>';
+document.getElementById('tbl').innerHTML = t;
+document.getElementById('tblSub').textContent = 'kWh por hora · ' + (D.archive ? 'día completo' : 'hasta las '+D.last);
+{ const tb = document.getElementById('tblBox');
+  tb.addEventListener('toggle', () => { document.getElementById('tblLabel').textContent = tb.open ? 'Tabla por hora (abierta)' : 'Ver tabla por hora'; }); }
+
+document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
+  'Página generada el '+D.built+' (hora de Argentina); se actualiza sola cada 5 minutos.';
+
+if (D.archive) document.getElementById('foot').innerHTML = 'Informe del '+dTxt+'. Energía en kWh y potencia en kW (promedio de cada 15 minutos), '+
+  'leídas de los medidores SMEC de la planta (AGRIM02P solar, DAGSR01P conexión a la red).';
+if (D.snapshot) document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
+  '<b>Vista de prueba</b> con datos hasta las '+D.last+'. La versión definitiva se actualizará sola cada 15 minutos.';
+// refresh: reload every 5 minutes, bypassing stale copies
+if (!D.snapshot && !D.archive) setTimeout(() => { location.replace(location.pathname + '?t=' + Date.now()); }, 5*60*1000);
+</script>
+</body>
+</html>
