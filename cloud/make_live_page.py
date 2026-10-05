@@ -387,6 +387,8 @@ details.tblbox.opbox .box{padding:10px 8px}
 .tip div.th{margin-bottom:2px}
 .tip .pe{font-weight:600;color:var(--ink2);font-size:.95em}
 @media print{.pivbtns,.pivmsg{display:none !important}}
+.tip div.pk{color:#9A6B00;font-weight:600;font-size:.92em;margin:1px 0 3px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tip div.pk{color:#F0C04A}}
 </style>
 </head>
 <body>
@@ -615,6 +617,18 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
       s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+labelFn(i)+'</text>';
     }
   }
+  // horario pico 18:00-23:00: shaded, hatched band behind the bars (each day in the 5-day view), label on top, strip on the time axis
+  if (unit === 'kW' && slots % 96 === 0){
+    const pk = '#E0A100';
+    s += '<defs><pattern id="'+el+'pk" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="'+pk+'" stroke-width="1.4" stroke-opacity="0.22"/></pattern></defs>';
+    for (let b=0; b<slots; b+=96){
+      const xa = pl + (b+72)*bw, xb = pl + (b+92)*bw, wd = xb - xa;
+      s += '<rect x="'+xa+'" y="'+pt+'" width="'+wd+'" height="'+ih+'" fill="'+pk+'" fill-opacity="0.08"/>';
+      s += '<rect x="'+xa+'" y="'+pt+'" width="'+wd+'" height="'+ih+'" fill="url(#'+el+'pk)"/>';
+      s += '<rect x="'+xa+'" y="'+(pt+ih)+'" width="'+wd+'" height="3" fill="'+pk+'"/>';
+      if (wd > 34) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" font-weight="600" fill="#9A6B00">'+(wd > 110 ? '&#9888; Horario pico 18–23' : wd > 60 ? '&#9888; Pico 18–23' : '&#9888;')+'</text>';
+    }
+  }
   const y0 = y(0);
   // shade the stretch that has grid readings but no solar readings (solar meter not answering)
   { let a0 = -1, a1 = -1;
@@ -670,7 +684,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible'); if (opt.onHover) opt.onHover(i);
     const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
     const pe = pivEstText(d, i, unit);
-    tip.innerHTML = '<div class="th"><b>'+tipLabel(i)+'</b>'+(pe ? '<span class="pe">'+pe+'</span>' : '')+'</div>'+row(col('--ink'),'<b>Consumo total del sitio</b>', d.grd[i]==null ? null : (d.onsite[i]||0)+(d.grd[i]||0))+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
+    tip.innerHTML = '<div class="th"><b>'+tipLabel(i)+'</b>'+(pe ? '<span class="pe">'+pe+'</span>' : '')+'</div>'+(unit === 'kW' && slots % 96 === 0 && i % 96 >= 72 && i % 96 < 92 ? '<div class="pk">&#9888; Horario pico (18–23)</div>' : '')+row(col('--ink'),'<b>Consumo total del sitio</b>', d.grd[i]==null ? null : (d.onsite[i]||0)+(d.grd[i]||0))+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
                     row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i])+(opt.tipExtra ? opt.tipExtra(i) : '');
     tip.style.display = 'block';
     const px = cx/W*rc.width, tw = tip.offsetWidth;
@@ -925,6 +939,8 @@ function renderPiv(){
   const TOP = 22, BOT = 18;
   PIV.g = {pl, bw, SW, H, TOP, BOT, rh, sp, cbw: (W-34-pr)/n};
   let s = '<svg class="pivsvg" viewBox="0 '+(-TOP)+' '+SW+' '+(H+TOP+BOT)+'" width="100%" style="display:block;touch-action:pan-y" role="img" aria-label="Horarios de los pivotes">';
+  // horario pico 18:00-23:00, same band as on the chart
+  s += '<rect x="'+(pl+72*bw).toFixed(2)+'" y="-4" width="'+(20*bw).toFixed(2)+'" height="'+(H-sp+8)+'" rx="4" fill="#E0A100" fill-opacity="0.10"/>';
   for (let p=0;p<PIV.n;p++){
     const y0 = p*(rh+sp);
     s += '<text x="'+(pl-6)+'" y="'+(y0+rh/2+3.5)+'" text-anchor="end" font-size="10.5" fill="'+cT+'">P'+(p+1)+'</text>';
