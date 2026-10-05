@@ -384,7 +384,8 @@ details.tblbox.opbox .box{padding:10px 8px}
 .pivmsg{color:var(--ink)}
 .pivmsg.ok{color:var(--onsite)}
 .pivmsg.err{color:var(--grid-in)}
-.tip div.est{border-top:1px solid var(--rule);margin-top:4px;padding-top:4px}
+.tip div.th{margin-bottom:2px}
+.tip .pe{font-weight:600;color:var(--ink2);font-size:.95em}
 @media print{.pivbtns,.pivmsg{display:none !important}}
 </style>
 </head>
@@ -558,10 +559,10 @@ document.getElementById('legend1').innerHTML = legendHTML;
 // estimated pivots running in a 15-minute slot, from the site's consumption: about 27 kW with no pivots running,
 // plus about 130 kW per pivot (calibrated on the readings of 1-5 Oct 2026)
 const PIV_BASE_KW = 27, PIV_EACH_KW = 130;
-function pivEstRow(d, i, unit){
+function pivEstText(d, i, unit){
   if (unit !== 'kW' || d.grd[i] == null) return '';
   const use = (d.onsite[i]||0) + (d.grd[i]||0), n = Math.max(0, Math.round((use - PIV_BASE_KW) / PIV_EACH_KW));
-  return '<div class="est"><span class="sw" style="background:transparent;border:1.5px dashed '+col('--ink3')+'"></span><span>Pivotes estimados (por consumo)</span><span>&asymp; '+n+'</span></div>';
+  return n === 0 ? 'sin pivotes operando' : '&asymp; '+n+(n === 1 ? ' pivote operando' : ' pivotes operando');
 }
 let PRINTING = false;
 function niceStep(range, target){
@@ -653,8 +654,9 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible'); if (opt.onHover) opt.onHover(i);
     const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
-    tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
-                    row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i])+(opt.tipExtra ? opt.tipExtra(i) : '')+pivEstRow(d, i, unit);
+    const pe = pivEstText(d, i, unit);
+    tip.innerHTML = '<div class="th"><b>'+tipLabel(i)+'</b>'+(pe ? '<span class="pe">'+pe+'</span>' : '')+'</div>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
+                    row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i])+(opt.tipExtra ? opt.tipExtra(i) : '');
     tip.style.display = 'block';
     const px = cx/W*rc.width, tw = tip.offsetWidth;
     tip.style.left = Math.max(0, Math.min(rc.width - tw, px - tw/2)) + 'px';
