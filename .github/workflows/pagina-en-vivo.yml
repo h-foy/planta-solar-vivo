@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}   # latest commit, not the one current when the run was queued
 
       - uses: actions/setup-python@v5
         with:
@@ -42,5 +44,6 @@ jobs:
           for d in nube data; do [ -e "$d" ] && git add "$d"; done
           if git diff --cached --quiet; then echo "Nothing to publish"; exit 0; fi
           git commit -m "Datos $(date +'%Y-%m-%d %H:%M')"
-          for i in 1 2 3; do git pull --rebase --quiet && git push --quiet && exit 0; sleep 5; done
+          for i in 1 2 3; do git pull --rebase -X theirs --quiet && git push --quiet && exit 0; sleep 5; done
+          git rebase --abort 2>/dev/null || true
           exit 1
