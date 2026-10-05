@@ -711,7 +711,7 @@ const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
 function draw(){
   if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps, unit:'kW'});
   else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15),
-    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {extra:pivLine, tipExtra:pivTip, onHover: i => pivHover(i, -1, true)} : {}));
+    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {tipExtra:pivTip, onHover: i => pivHover(i, -1, true)} : {}));
   if (typeof renderOp === 'function') renderOp();
 }
 draw();
@@ -883,8 +883,8 @@ function pivLine(y, pl, bw){
   return '<path d="'+d+'" fill="none" stroke="'+col('--card')+'" stroke-width="5" stroke-linejoin="round"/>' +
          '<path d="'+d+'" fill="none" stroke="'+col('--piv')+'" stroke-width="2.25" stroke-linejoin="round"/>';
 }
-function pivTip(i){ const n = pivN(i);
-  return '<div><span class="sw" style="background:'+col('--piv')+'"></span><span>Pivotes registrados</span><span>'+n+' &times; '+fmt(PIV.kw,0)+' = '+fmt(n*PIV.kw,0)+' kW</span></div>'; }
+function pivTip(i){ const on = []; if (PIV.on) PIV.on.forEach((r,p) => { if (r[i]) on.push('P'+(p+1)); });
+  return '<div><span class="sw" style="background:'+col('--piv')+'"></span><span>Pivotes encendidos</span><span>'+(on.length ? on.join(', ') : 'ninguno')+'</span></div>'; }
 const pivCanEdit = () => PIV.edit && !!PIV.pw;
 function renderPiv(){
   const el = document.getElementById('piv'), n = 96, K = PIV.kw;
@@ -919,7 +919,7 @@ function renderPiv(){
   else if (!PIV.pw) btns = '<input type="password" id="pivPw" placeholder="Contraseña" autocomplete="current-password">' +
        '<button type="button" class="pbtn pri" data-a="login"'+(PIV.busy?' disabled':'')+'>Entrar</button><button type="button" class="pbtn" data-a="cancel">Cancelar</button>';
   else btns = '<button type="button" class="pbtn pri" data-a="save"'+(PIV.busy?' disabled':'')+'>'+(PIV.busy ? 'Guardando…' : 'Guardar')+'</button><button type="button" class="pbtn" data-a="cancel">Cancelar</button>';
-  let h = '<div class="pivhd"><span><b>Pivotes de riego</b> &middot; '+fmt(K,0)+' kW c/u <span class="pivkey"><i></i>encendido</span></span><span class="pivbtns">'+btns+'</span></div>' + s;
+  let h = '<div class="pivhd"><span><b>Pivotes de riego</b> <span class="pivkey"><i></i>encendido</span></span><span class="pivbtns">'+btns+'</span></div>' + s;
   let msg = PIV.msg, cls = PIV.cls;
   if (!msg && pivCanEdit()) msg = PIV.pend
       ? 'Pivote '+(PIV.pend.p+1)+' encendido a las <b>'+hhmm(PIV.pend.i*15)+'</b>. Toque el cuarto de hora en que se <b>apagó</b>.'
@@ -929,7 +929,7 @@ function renderPiv(){
   for (let i=0;i<n;i++){ const u = pivUse(i); if (u!=null) used += u/4; }
   for (let p=0;p<PIV.n;p++){ const c = PIV.on[p].filter(Boolean).length; if (c){ tot += c; per.push('P'+(p+1)+' '+fmt(c/4,2)+' h'); } }
   h += '<p class="pivsum">' + (tot
-      ? 'Registrado: <b>'+fmt(tot/4,2)+' h</b> de pivote &middot; <b>'+fmt(tot/4*K,0)+' kWh</b>' + (used>0 ? ' de '+fmt(used,0)+' kWh medidos' : '') + '<br>'+per.join(' &middot; ')
+      ? 'Registrado: <b>'+fmt(tot/4,2)+' h</b> de pivote<br>'+per.join(' &middot; ')
       : 'Todavía no hay horarios de pivotes para este día.') + '</p>';
   el.innerHTML = h;
   const svg = el.querySelector('.pivsvg');
