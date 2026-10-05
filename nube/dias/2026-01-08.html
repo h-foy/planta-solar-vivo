@@ -165,6 +165,8 @@ details.tblbox.opbox .box{padding:10px 8px}
 .pivmsg{color:var(--ink)}
 .pivmsg.ok{color:var(--onsite)}
 .pivmsg.err{color:var(--grid-in)}
+.tip div.th{margin-bottom:2px}
+.tip .pe{font-weight:600;color:var(--ink2);font-size:.95em}
 @media print{.pivbtns,.pivmsg{display:none !important}}
 </style>
 </head>
@@ -290,6 +292,21 @@ if (D.archive){
           '. Se muestran los datos de la red al día; la parte solar se completará sola cuando vuelva la conexión.';
   }
   if (msg){ document.getElementById('staleText').textContent = msg; document.getElementById('stale').classList.add('on'); }
+  // which meter is failing, and since when (nube/estado/medidores.json, written by every update run even when the page can't be rebuilt)
+  if (msg && D.date >= todayAR) fetch('estado/medidores.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j || !j.medidores) return;
+    const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+    const when = s => !s ? '?' : (s.slice(0,10) === todayAR ? s.slice(11) : s.slice(8,10)+'/'+s.slice(5,7)+' '+s.slice(11));
+    const order = [['DAGSR01P','Medidor de entrada (red)'], ['AGRIM02P','Medidor de la planta solar']];
+    const lines = order.filter(([k]) => j.medidores[k]).map(([k, nm]) => { const m = j.medidores[k];
+      return m.ok ? '&#10003; <b>'+nm+'</b>: funciona &middot; última lectura '+esc(when(m.ultima))
+                  : '&#10007; <b>'+nm+'</b>: sin conexión &middot; última lectura '+esc(when(m.ultima))+(m.intento ? ' &middot; último intento '+esc(when(m.intento)) : '')+(m.error ? ' ('+esc(m.error)+')' : ''); });
+    if (!lines.length) return;
+    const bad = order.filter(([k]) => j.medidores[k] && !j.medidores[k].ok).map(([, nm]) => nm.toLowerCase());
+    const head = bad.length ? 'Sin lecturas nuevas desde las '+D.last+': '+(bad.length === 2 ? 'los dos medidores no responden.' : 'el '+bad[0]+' no responde.')
+                            : 'Sin lecturas nuevas desde las '+D.last+'.';
+    document.getElementById('staleText').innerHTML = esc(head)+'<br>'+lines.join('<br>')+'<br><small>La página se pondrá al día sola cuando vuelva la conexión.</small>';
+  }).catch(() => {});
 })();
 
 // ---- tiles ----
@@ -335,6 +352,14 @@ const legendHTML = S.map(s => s.line
 document.getElementById('legend1').innerHTML = legendHTML;
 
 // ---- chart ----
+// estimated pivots running in a 15-minute slot, from the site's consumption: about 27 kW with no pivots running,
+// plus about 130 kW per pivot (calibrated on the readings of 1-5 Oct 2026)
+const PIV_BASE_KW = 27, PIV_EACH_KW = 130;
+function pivEstText(d, i, unit){
+  if (unit !== 'kW' || d.grd[i] == null) return '';
+  const use = (d.onsite[i]||0) + (d.grd[i]||0), n = Math.max(0, Math.round((use - PIV_BASE_KW) / PIV_EACH_KW));
+  return n === 0 ? 'sin pivotes operando' : '&asymp; '+n+(n === 1 ? ' pivote operando' : ' pivotes operando');
+}
 let PRINTING = false;
 function niceStep(range, target){
   const raw = range/target, p = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -425,7 +450,8 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible'); if (opt.onHover) opt.onHover(i);
     const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
-    tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
+    const pe = pivEstText(d, i, unit);
+    tip.innerHTML = '<div class="th"><b>'+tipLabel(i)+'</b>'+(pe ? '<span class="pe">'+pe+'</span>' : '')+'</div>'+row(col('--ink'),'<b>Consumo total del sitio</b>', d.grd[i]==null ? null : (d.onsite[i]||0)+(d.grd[i]||0))+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
                     row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i])+(opt.tipExtra ? opt.tipExtra(i) : '');
     tip.style.display = 'block';
     const px = cx/W*rc.width, tw = tip.offsetWidth;
@@ -492,7 +518,7 @@ const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
 function draw(){
   if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps, unit:'kW'});
   else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15),
-    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {tipExtra:pivTip, onHover: i => pivHover(i, -1, true)} : {}));
+    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {onHover: i => pivHover(i, -1, true)} : {}));
   if (typeof renderOp === 'function') renderOp();
 }
 draw();
