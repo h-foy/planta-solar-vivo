@@ -511,6 +511,21 @@ if (D.archive){
           '. Se muestran los datos de la red al día; la parte solar se completará sola cuando vuelva la conexión.';
   }
   if (msg){ document.getElementById('staleText').textContent = msg; document.getElementById('stale').classList.add('on'); }
+  // which meter is failing, and since when (nube/estado/medidores.json, written by every update run even when the page can't be rebuilt)
+  if (msg && D.date >= todayAR) fetch('estado/medidores.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j || !j.medidores) return;
+    const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+    const when = s => !s ? '?' : (s.slice(0,10) === todayAR ? s.slice(11) : s.slice(8,10)+'/'+s.slice(5,7)+' '+s.slice(11));
+    const order = [['DAGSR01P','Medidor de entrada (red)'], ['AGRIM02P','Medidor de la planta solar']];
+    const lines = order.filter(([k]) => j.medidores[k]).map(([k, nm]) => { const m = j.medidores[k];
+      return m.ok ? '&#10003; <b>'+nm+'</b>: funciona &middot; última lectura '+esc(when(m.ultima))
+                  : '&#10007; <b>'+nm+'</b>: sin conexión &middot; última lectura '+esc(when(m.ultima))+(m.intento ? ' &middot; último intento '+esc(when(m.intento)) : '')+(m.error ? ' ('+esc(m.error)+')' : ''); });
+    if (!lines.length) return;
+    const bad = order.filter(([k]) => j.medidores[k] && !j.medidores[k].ok).map(([, nm]) => nm.toLowerCase());
+    const head = bad.length ? 'Sin lecturas nuevas desde las '+D.last+': '+(bad.length === 2 ? 'los dos medidores no responden.' : 'el '+bad[0]+' no responde.')
+                            : 'Sin lecturas nuevas desde las '+D.last+'.';
+    document.getElementById('staleText').innerHTML = esc(head)+'<br>'+lines.join('<br>')+'<br><small>La página se pondrá al día sola cuando vuelva la conexión.</small>';
+  }).catch(() => {});
 })();
 
 // ---- tiles ----
