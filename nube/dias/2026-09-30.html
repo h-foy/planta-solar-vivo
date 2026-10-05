@@ -145,6 +145,27 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
   footer{margin-top:4px;font-size:9px}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+/* ---- irrigation pivots ---- */
+:root{--piv:#5B5FC7}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--piv:#8C8FF2}}
+:root[data-theme="dark"]{--piv:#8C8FF2}
+details.tblbox.opbox .play{background:var(--piv)}
+details.tblbox.opbox .box{padding:10px 8px}
+.pivhd{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:space-between;align-items:center;margin:2px 2px 8px 2px;font-size:13px;color:var(--ink2)}
+.pivhd b{color:var(--ink);font-weight:600}
+.pivkey{font-size:11px;color:var(--ink3)}
+.pivkey i{display:inline-block;width:10px;height:8px;border-radius:2px;margin-right:4px;background:var(--piv)}
+.pivbtns{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pbtn{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--rule);background:var(--card);color:var(--ink);cursor:pointer}
+.pbtn:hover{border-color:var(--axis)}
+.pbtn.pri{background:var(--piv);border-color:var(--piv);color:#fff}
+.pbtn[disabled]{opacity:.6;cursor:default}
+.pivhd input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--rule);border-radius:8px;background:var(--card);color:var(--ink);width:150px}
+.pivmsg,.pivsum{font-size:12px;color:var(--ink2);margin:8px 2px 0 2px}
+.pivmsg{color:var(--ink)}
+.pivmsg.ok{color:var(--onsite)}
+.pivmsg.err{color:var(--grid-in)}
+@media print{.pivbtns,.pivmsg{display:none !important}}
 </style>
 </head>
 <body>
@@ -178,6 +199,11 @@ footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
     <div class="chart" id="c15"></div>
     <div class="days" id="days5" hidden></div>
   </section>
+
+  <details class="tblbox opbox" id="opBox">
+    <summary><span class="play" aria-hidden="true">&#9881;</span><span>Detalle operativo pivotes</span><span class="sub2" id="opSub"></span></summary>
+    <div class="box"><div class="piv" id="piv"></div></div>
+  </details>
 
   <section class="cam" id="cam" aria-label="Cámara de la planta">
     <button class="open" id="camBtn" type="button" aria-expanded="false" aria-controls="camBox">
@@ -385,6 +411,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     const lp = pts[pts.length-1];
     s += '<circle cx="'+lp[0]+'" cy="'+lp[1]+'" r="4.5" fill="'+cS+'" stroke="'+cCard+'" stroke-width="2"/>';
   }
+  if (opt.extra) s += opt.extra(y, pl, bw);
   s += '<line id="'+el+'x" x1="0" x2="0" y1="'+pt+'" y2="'+(pt+ih)+'" stroke="'+col('--ink3')+'" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>';
   s += '<rect x="'+pl+'" y="0" width="'+iw+'" height="'+Hh+'" fill="transparent" id="'+el+'hit"/>';
   s += '</svg><div class="tip" id="'+el+'tip"></div>';
@@ -399,7 +426,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible');
     const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
     tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
-                    row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i]);
+                    row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i])+(opt.tipExtra ? opt.tipExtra(i) : '');
     tip.style.display = 'block';
     const px = cx/W*rc.width, tw = tip.offsetWidth;
     tip.style.left = Math.max(0, Math.min(rc.width - tw, px - tw/2)) + 'px';
@@ -464,7 +491,9 @@ setMode(mode5);
 const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
 function draw(){
   if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps, unit:'kW'});
-  else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15), {unit:'kW'});
+  else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15),
+    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {extra:pivLine, tipExtra:pivTip} : {}));
+  if (typeof renderOp === 'function') renderOp();
 }
 draw();
 
@@ -606,7 +635,143 @@ if (D.archive) document.getElementById('foot').innerHTML = 'Informe del '+dTxt+'
 if (D.snapshot) document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
   '<b>Vista de prueba</b> con datos hasta las '+D.last+'. La versión definitiva se actualizará sola cada 15 minutos.';
 // refresh: reload every 5 minutes, bypassing stale copies
-if (!D.snapshot && !D.archive) setTimeout(() => { location.replace(location.pathname + '?t=' + Date.now()); }, 5*60*1000);
+// reload every 5 minutes for fresh readings, but never while someone is editing the pivot times
+function reloadLater(){ setTimeout(() => { if (window.PIV_BUSY && window.PIV_BUSY()) return reloadLater();
+  location.replace(location.pathname + '?t=' + Date.now()); }, 5*60*1000); }
+if (!D.snapshot && !D.archive) reloadLater();
+</script>
+<script>
+// ---- irrigation pivots: "Detalle operativo pivotes" ----
+// Times are stored per day in pivotes/YYYY-MM-DD.json at the site root ({"date":..,"on":["0101..." x N]}, one 96-char
+// string per pivot, '1' = on in that 15-minute slot). pivotes/config.json holds {"n":10,"kw":140,"api":"https://..."};
+// "api" is the small helper service that checks the edit password and saves the file (the GitHub key never reaches the page).
+const PIV = {n:10, kw:140, api:'', on:null, saved:'[]', loaded:false, edit:false, pend:null, pw:'', msg:'', cls:'', busy:false};
+const PIV_ROOT = D.archive ? '../../' : '../';
+const pivBlank = () => Array.from({length:PIV.n}, () => new Array(96).fill(false));
+function pivFrom(list){ const a = pivBlank();
+  (list || []).forEach((s,p) => { if (p < PIV.n && typeof s === 'string') for (let i=0;i<96;i++) a[p][i] = s[i] === '1'; }); return a; }
+const pivTo = a => a.map(r => r.map(v => v ? '1' : '0').join(''));
+function pivSs(k, v){ try { if (v === undefined) return sessionStorage.getItem(k) || ''; if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch(e) {} return ''; }
+const pivDirty = () => !!PIV.on && JSON.stringify(pivTo(PIV.on)) !== PIV.saved;
+window.PIV_BUSY = () => PIV.edit || pivDirty();
+function pivN(i){ let n = 0; if (PIV.on) for (const r of PIV.on) if (r[i]) n++; return n; }
+function pivUse(i){ if (q.grd[i]==null) return null; const s = q.sol[i], j = q.inj[i]||0;
+  return ((s==null ? 0 : Math.max(0, s-j)) + (q.grd[i]||0)) * 4; }
+function pivLine(y, pl, bw){
+  let d = '';
+  for (let i=0;i<96;i++){ const yy = Math.max(2, y(pivN(i)*PIV.kw)).toFixed(1);
+    d += (i ? 'L' : 'M') + (pl+i*bw).toFixed(1) + ',' + yy + 'L' + (pl+(i+1)*bw).toFixed(1) + ',' + yy; }
+  return '<path d="'+d+'" fill="none" stroke="'+col('--card')+'" stroke-width="5" stroke-linejoin="round"/>' +
+         '<path d="'+d+'" fill="none" stroke="'+col('--piv')+'" stroke-width="2.25" stroke-linejoin="round"/>';
+}
+function pivTip(i){ const n = pivN(i);
+  return '<div><span class="sw" style="background:'+col('--piv')+'"></span><span>Pivotes registrados</span><span>'+n+' &times; '+fmt(PIV.kw,0)+' = '+fmt(n*PIV.kw,0)+' kW</span></div>'; }
+const pivCanEdit = () => PIV.edit && !!PIV.pw;
+function renderPiv(){
+  const el = document.getElementById('piv'), n = 96, K = PIV.kw;
+  // same geometry as chart('c15') above, shifted by the horizontal offset between the two boxes, so each cell sits under its bar
+  const c15 = document.getElementById('c15');
+  const W = Math.max(300, Math.round(c15.clientWidth || 340));
+  const off = c15.getBoundingClientRect().left - el.getBoundingClientRect().left, SW = Math.max(W, Math.round(el.clientWidth || W));
+  const pl = off + 34, pr = 6, iw = W-34-pr, bw = iw/n, gap = bw < 3 ? 0 : Math.max(1, Math.min(2, bw*0.18)), w = Math.max(.5, bw-gap);
+  const rr = Math.min(2, w/2), rh = pivCanEdit() ? 22 : 12, sp = 4, H = PIV.n*(rh+sp);
+  const cOn = col('--piv'), cOff = col('--grid'), cSt = col('--ink'), cT = col('--ink3');
+  let s = '<svg class="pivsvg" viewBox="0 -2 '+SW+' '+(H+2)+'" width="100%" style="display:block" role="img" aria-label="Horarios de los pivotes">';
+  for (let p=0;p<PIV.n;p++){
+    const y0 = p*(rh+sp);
+    s += '<text x="'+(pl-6)+'" y="'+(y0+rh/2+3.5)+'" text-anchor="end" font-size="10.5" fill="'+cT+'">P'+(p+1)+'</text>';
+    for (let i=0;i<n;i++){
+      const c = PIV.pend && PIV.pend.p===p && PIV.pend.i===i ? cSt : PIV.on[p][i] ? cOn : cOff;
+      s += '<rect data-p="'+p+'" data-i="'+i+'" x="'+(pl+i*bw+gap/2).toFixed(2)+'" y="'+y0+'" width="'+w.toFixed(2)+'" height="'+rh+'" rx="'+rr+'" fill="'+c+'"><title>Pivote '+(p+1)+' · '+hhmm(i*15)+'–'+hhmm(i*15+15)+'</title></rect>';
+    }
+    if (pivCanEdit()) for (let i=0;i<n;i++)   // full-width tap target per slot, so taps between thin bars still land on a slot
+      s += '<rect data-p="'+p+'" data-i="'+i+'" x="'+(pl+i*bw).toFixed(2)+'" y="'+y0+'" width="'+bw.toFixed(2)+'" height="'+rh+'" fill="transparent" style="cursor:pointer"/>';
+  }
+  s += '</svg>';
+  let btns;
+  if (!PIV.edit) btns = '<button type="button" class="pbtn" data-a="edit">Editar horarios</button>';
+  else if (!PIV.pw) btns = '<input type="password" id="pivPw" placeholder="Contraseña" autocomplete="current-password">' +
+       '<button type="button" class="pbtn pri" data-a="login"'+(PIV.busy?' disabled':'')+'>Entrar</button><button type="button" class="pbtn" data-a="cancel">Cancelar</button>';
+  else btns = '<button type="button" class="pbtn pri" data-a="save"'+(PIV.busy?' disabled':'')+'>'+(PIV.busy ? 'Guardando…' : 'Guardar')+'</button><button type="button" class="pbtn" data-a="cancel">Cancelar</button>';
+  let h = '<div class="pivhd"><span><b>Pivotes de riego</b> &middot; '+fmt(K,0)+' kW c/u <span class="pivkey"><i></i>encendido</span></span><span class="pivbtns">'+btns+'</span></div>' + s;
+  let msg = PIV.msg, cls = PIV.cls;
+  if (!msg && pivCanEdit()) msg = PIV.pend
+      ? 'Pivote '+(PIV.pend.p+1)+' encendido a las <b>'+hhmm(PIV.pend.i*15)+'</b>. Toque el cuarto de hora en que se <b>apagó</b>.'
+      : 'Toque el cuarto de hora de <b>encendido</b> de un pivote y después el de <b>apagado</b>. Tocar un tramo ya marcado lo borra. Al terminar, <b>Guardar</b>.';
+  if (msg) h += '<p class="pivmsg'+(cls ? ' '+cls : '')+'">'+msg+'</p>';
+  let tot = 0, used = 0; const per = [];
+  for (let i=0;i<n;i++){ const u = pivUse(i); if (u!=null) used += u/4; }
+  for (let p=0;p<PIV.n;p++){ const c = PIV.on[p].filter(Boolean).length; if (c){ tot += c; per.push('P'+(p+1)+' '+fmt(c/4,2)+' h'); } }
+  h += '<p class="pivsum">' + (tot
+      ? 'Registrado: <b>'+fmt(tot/4,2)+' h</b> de pivote &middot; <b>'+fmt(tot/4*K,0)+' kWh</b>' + (used>0 ? ' de '+fmt(used,0)+' kWh medidos' : '') + '<br>'+per.join(' &middot; ')
+      : 'Todavía no hay horarios de pivotes para este día.') + '</p>';
+  el.innerHTML = h;
+  const pw = document.getElementById('pivPw');
+  if (pw){ pw.focus(); pw.addEventListener('keydown', e => { if (e.key === 'Enter') pivAction('login'); }); }
+}
+function renderOp(){
+  const box = document.getElementById('opBox'); if (!box || !PIV.loaded) return;
+  let named = 0; for (const r of PIV.on) if (r.some(Boolean)) named++;
+  document.getElementById('opSub').textContent = named ? named+' con horario' : '';
+  if (!box.open) return;
+  if (mode5 && F){ document.getElementById('piv').innerHTML = '<p class="pivsum">Los horarios de los pivotes se ven con el gráfico en la vista <b>Día</b>.</p>'; return; }
+  renderPiv();
+}
+async function pivPost(path, body){
+  const r = await fetch(PIV.api + path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  let j = {}; try { j = await r.json(); } catch(e) {}
+  return {status:r.status, j};
+}
+async function pivAction(a){
+  PIV.msg = ''; PIV.cls = '';
+  if (a === 'edit'){
+    if (!PIV.api){ PIV.msg = 'La edición de horarios todavía no está habilitada.'; }
+    else { PIV.edit = true; PIV.pend = null; }
+  } else if (a === 'cancel'){
+    PIV.on = pivFrom(JSON.parse(PIV.saved)); PIV.edit = false; PIV.pend = null;
+  } else if (a === 'login'){
+    const pw = (document.getElementById('pivPw') || {}).value || '';
+    if (!pw){ PIV.msg = 'Escriba la contraseña.'; PIV.cls = 'err'; }
+    else { PIV.busy = true; draw();
+      try { const r = await pivPost('/check', {password:pw});
+        if (r.status === 200){ PIV.pw = pw; pivSs('pivpw', pw); }
+        else { PIV.msg = r.status === 401 ? 'Contraseña incorrecta.' : 'No se pudo verificar la contraseña ('+r.status+').'; PIV.cls = 'err'; }
+      } catch(e){ PIV.msg = 'Sin conexión con el servicio de guardado.'; PIV.cls = 'err'; }
+      PIV.busy = false; }
+  } else if (a === 'save'){
+    PIV.busy = true; PIV.pend = null; draw();
+    const on = pivTo(PIV.on);
+    try { const r = await pivPost('/pivotes', {date:D.date, on, password:PIV.pw});
+      if (r.status === 200){ PIV.saved = JSON.stringify(on); PIV.edit = false; PIV.msg = 'Guardado &#10003;'; PIV.cls = 'ok'; }
+      else if (r.status === 401){ PIV.pw = ''; pivSs('pivpw', null); PIV.msg = 'La contraseña no es válida; ingrésela de nuevo y vuelva a Guardar.'; PIV.cls = 'err'; }
+      else { PIV.msg = 'No se pudo guardar ('+(r.j.error || r.status)+'). Intente de nuevo.'; PIV.cls = 'err'; }
+    } catch(e){ PIV.msg = 'Sin conexión con el servicio de guardado. Intente de nuevo.'; PIV.cls = 'err'; }
+    PIV.busy = false;
+  }
+  draw();
+}
+document.getElementById('piv').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-a]'); if (b){ if (!b.disabled) pivAction(b.dataset.a); return; }
+  if (!pivCanEdit() || PIV.busy) return;
+  const cell = ev.target.closest('rect[data-p]'); if (!cell) return;
+  const p = +cell.dataset.p, i = +cell.dataset.i, r = PIV.on[p];
+  PIV.msg = '';
+  if (!PIV.pend && r[i]){ let a = i, b2 = i; while (a>0 && r[a-1]) a--; while (b2<95 && r[b2+1]) b2++; for (let k=a;k<=b2;k++) r[k] = false; }
+  else if (!PIV.pend || PIV.pend.p !== p) PIV.pend = {p, i};
+  else { const a = Math.min(PIV.pend.i, i), b2 = Math.max(PIV.pend.i, i); for (let k=a; k<Math.max(b2, a+1); k++) r[k] = true; PIV.pend = null; }
+  draw();
+});
+document.getElementById('opBox').addEventListener('toggle', () => draw());
+window.addEventListener('beforeunload', e => { if (pivDirty()){ e.preventDefault(); e.returnValue = ''; } });
+(async function pivInit(){
+  try { const c = await fetch(PIV_ROOT+'pivotes/config.json?t='+Date.now(), {cache:'no-store'});
+    if (c.ok){ const j = await c.json(); if (j.n) PIV.n = Math.max(1, Math.min(20, j.n|0)); if (j.kw) PIV.kw = +j.kw || PIV.kw; if (j.api) PIV.api = String(j.api).replace(/\/+$/,''); } } catch(e) {}
+  let j = null;
+  if (PIV.api){ try { const r = await fetch(PIV.api+'/pivotes?date='+D.date, {cache:'no-store'}); if (r.ok) j = await r.json(); } catch(e) {} }
+  if (!j){ try { const r = await fetch(PIV_ROOT+'pivotes/'+D.date+'.json?t='+Date.now(), {cache:'no-store'}); if (r.ok) j = await r.json(); } catch(e) {} }
+  PIV.on = pivFrom(j && j.on); PIV.saved = JSON.stringify(pivTo(PIV.on)); PIV.pw = pivSs('pivpw'); PIV.loaded = true;
+  draw();
+})();
 </script>
 </body>
 </html>
