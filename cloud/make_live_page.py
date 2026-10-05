@@ -655,7 +655,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible'); if (opt.onHover) opt.onHover(i);
     const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
     const pe = pivEstText(d, i, unit);
-    tip.innerHTML = '<div class="th"><b>'+tipLabel(i)+'</b>'+(pe ? '<span class="pe">'+pe+'</span>' : '')+'</div>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
+    tip.innerHTML = '<div class="th"><b>'+tipLabel(i)+'</b>'+(pe ? '<span class="pe">'+pe+'</span>' : '')+'</div>'+row(col('--ink'),'<b>Consumo total del sitio</b>', d.grd[i]==null ? null : (d.onsite[i]||0)+(d.grd[i]||0))+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
                     row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i])+(opt.tipExtra ? opt.tipExtra(i) : '');
     tip.style.display = 'block';
     const px = cx/W*rc.width, tw = tip.offsetWidth;
