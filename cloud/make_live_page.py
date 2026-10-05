@@ -642,7 +642,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     const sx = (pt0.clientX - rc.left) / rc.width * W;
     let i = Math.floor((sx-pl)/bw); i = Math.max(0, Math.min(slots-1, i));
     if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
-    const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible');
+    const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible'); if (opt.onHover) opt.onHover(i);
     const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
     tip.innerHTML = '<b>'+tipLabel(i)+'</b>'+row(cS,'Producción solar',d.sol[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
                     row(cG,'Comprada a la red',d.grd[i])+row(cI,'Inyectada a la red',d.inj[i])+(opt.tipExtra ? opt.tipExtra(i) : '');
@@ -651,7 +651,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     tip.style.left = Math.max(0, Math.min(rc.width - tw, px - tw/2)) + 'px';
     tip.style.top = '-6px'; tip.style.transform = 'translateY(-100%)';
   };
-  const hide = () => { tip.style.display='none'; xl.setAttribute('visibility','hidden'); };
+  const hide = () => { tip.style.display='none'; xl.setAttribute('visibility','hidden'); if (opt.onHover) opt.onHover(-1); };
   svg.addEventListener('mousemove', show); svg.addEventListener('mouseleave', hide);
   svg.addEventListener('touchstart', show, {passive:true}); svg.addEventListener('touchmove', show, {passive:true});
   document.addEventListener('touchstart', e => { if (!box.contains(e.target)) hide(); }, {passive:true});
@@ -711,7 +711,7 @@ const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
 function draw(){
   if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps, unit:'kW'});
   else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15),
-    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {extra:pivLine, tipExtra:pivTip} : {}));
+    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {extra:pivLine, tipExtra:pivTip, onHover: i => pivHover(i, -1, true)} : {}));
   if (typeof renderOp === 'function') renderOp();
 }
 draw();
@@ -895,7 +895,9 @@ function renderPiv(){
   const pl = off + 34, pr = 6, iw = W-34-pr, bw = iw/n, gap = bw < 3 ? 0 : Math.max(1, Math.min(2, bw*0.18)), w = Math.max(.5, bw-gap);
   const rr = Math.min(2, w/2), rh = pivCanEdit() ? 22 : 12, sp = 4, H = PIV.n*(rh+sp);
   const cOn = col('--piv'), cOff = col('--grid'), cSt = col('--ink'), cT = col('--ink3');
-  let s = '<svg class="pivsvg" viewBox="0 -2 '+SW+' '+(H+2)+'" width="100%" style="display:block" role="img" aria-label="Horarios de los pivotes">';
+  const TOP = 22, BOT = 18;
+  PIV.g = {pl, bw, SW, H, TOP, BOT, rh, sp, cbw: (W-34-pr)/n};
+  let s = '<svg class="pivsvg" viewBox="0 '+(-TOP)+' '+SW+' '+(H+TOP+BOT)+'" width="100%" style="display:block;touch-action:pan-y" role="img" aria-label="Horarios de los pivotes">';
   for (let p=0;p<PIV.n;p++){
     const y0 = p*(rh+sp);
     s += '<text x="'+(pl-6)+'" y="'+(y0+rh/2+3.5)+'" text-anchor="end" font-size="10.5" fill="'+cT+'">P'+(p+1)+'</text>';
@@ -906,6 +908,11 @@ function renderPiv(){
     if (pivCanEdit()) for (let i=0;i<n;i++)   // full-width tap target per slot, so taps between thin bars still land on a slot
       s += '<rect data-p="'+p+'" data-i="'+i+'" x="'+(pl+i*bw).toFixed(2)+'" y="'+y0+'" width="'+bw.toFixed(2)+'" height="'+rh+'" fill="transparent" style="cursor:pointer"/>';
   }
+  const every = W < 480 ? 16 : 12;   // same hour labels as the chart above
+  for (let i=0;i<n;i+=every) s += '<text x="'+(pl+i*bw).toFixed(1)+'" y="'+(H+12)+'" font-size="10.5" fill="'+cT+'" text-anchor="middle">'+hhmm(i*15)+'</text>';
+  s += '<line id="pivX" x1="0" x2="0" y1="-4" y2="'+(H-sp)+'" stroke="'+cT+'" stroke-width="1" stroke-dasharray="3 3" visibility="hidden" pointer-events="none"/>';
+  s += '<g id="pivT" visibility="hidden" pointer-events="none"><rect x="0" y="'+(-TOP+1)+'" height="17" rx="5" fill="'+col('--ink')+'"/>' +
+       '<text x="0" y="'+(-TOP+13.5)+'" font-size="11.5" font-weight="600" fill="'+col('--card')+'" text-anchor="middle"></text></g>';
   s += '</svg>';
   let btns;
   if (!PIV.edit) btns = '<button type="button" class="pbtn" data-a="edit">Editar horarios</button>';
@@ -925,8 +932,37 @@ function renderPiv(){
       ? 'Registrado: <b>'+fmt(tot/4,2)+' h</b> de pivote &middot; <b>'+fmt(tot/4*K,0)+' kWh</b>' + (used>0 ? ' de '+fmt(used,0)+' kWh medidos' : '') + '<br>'+per.join(' &middot; ')
       : 'Todavía no hay horarios de pivotes para este día.') + '</p>';
   el.innerHTML = h;
+  const svg = el.querySelector('.pivsvg');
+  const move = ev => { const t = ev.touches ? ev.touches[0] : ev, r = svg.getBoundingClientRect(), g = PIV.g;
+    const x = (t.clientX - r.left) * g.SW / r.width, y = (t.clientY - r.top) * (g.H + g.TOP + g.BOT) / r.height - g.TOP;
+    const i = Math.floor((x - g.pl) / g.bw), p = Math.floor(y / (g.rh + g.sp));
+    pivHover(i >= 0 && i < 96 ? i : -1, p >= 0 && p < PIV.n ? p : -1, false); };
+  svg.addEventListener('mousemove', move); svg.addEventListener('mouseleave', () => pivHover(-1, -1, false));
+  svg.addEventListener('touchstart', move, {passive:true}); svg.addEventListener('touchmove', move, {passive:true});
   const pw = document.getElementById('pivPw');
   if (pw){ pw.focus(); pw.addEventListener('keydown', e => { if (e.key === 'Enter') pivAction('login'); }); }
+}
+// time guide: dashed line + time label over the pivot rows, mirrored on the main chart's dashed line
+function pivHover(i, p, fromChart){
+  const ln = document.getElementById('pivX'), lab = document.getElementById('pivT'), g = PIV.g;
+  if (!ln || !g) return;
+  const xl = document.getElementById('c15x');
+  if (i < 0){ ln.setAttribute('visibility','hidden'); lab.setAttribute('visibility','hidden');
+    if (!fromChart && xl) xl.setAttribute('visibility','hidden'); return; }
+  const cx = g.pl + i*g.bw + g.bw/2;
+  ln.setAttribute('x1', cx); ln.setAttribute('x2', cx); ln.setAttribute('visibility','visible');
+  let txt = hhmm(i*15)+'–'+hhmm(i*15+15);
+  if (PIV.pend && p === PIV.pend.p && pivCanEdit()){
+    const a = Math.min(PIV.pend.i, i), b = Math.max(PIV.pend.i, i), m = Math.max(b, a+1) - a;
+    txt = 'P'+(p+1)+'  '+hhmm(a*15)+' → '+hhmm(Math.max(b, a+1)*15)+'  ·  '+(m >= 4 ? Math.floor(m/4)+' h ' : '')+(m % 4 ? (m % 4)*15+' min' : '');
+  } else if (p >= 0) txt = 'P'+(p+1)+'  ·  '+txt;
+  const t = lab.querySelector('text'), rc = lab.querySelector('rect');
+  t.textContent = txt;
+  const tw = (t.getComputedTextLength ? t.getComputedTextLength() : txt.length*6.5) + 14;
+  const lx = Math.max(tw/2 + 2, Math.min(g.SW - tw/2 - 2, cx));
+  t.setAttribute('x', lx); rc.setAttribute('x', lx - tw/2); rc.setAttribute('width', tw);
+  lab.setAttribute('visibility','visible');
+  if (!fromChart && xl){ const c = 34 + i*g.cbw + g.cbw/2; xl.setAttribute('x1', c); xl.setAttribute('x2', c); xl.setAttribute('visibility','visible'); }
 }
 function renderOp(){
   const box = document.getElementById('opBox'); if (!box || !PIV.loaded) return;
