@@ -722,7 +722,7 @@ const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
 function draw(){
   if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps, unit:'kW'});
   else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15),
-    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {tipExtra:pivTip, onHover: i => pivHover(i, -1, true)} : {}));
+    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {onHover: i => pivHover(i, -1, true)} : {}));
   if (typeof renderOp === 'function') renderOp();
 }
 draw();
