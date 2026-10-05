@@ -939,8 +939,14 @@ function renderPiv(){
   const TOP = 22, BOT = 18;
   PIV.g = {pl, bw, SW, H, TOP, BOT, rh, sp, cbw: (W-34-pr)/n};
   let s = '<svg class="pivsvg" viewBox="0 '+(-TOP)+' '+SW+' '+(H+TOP+BOT)+'" width="100%" style="display:block;touch-action:pan-y" role="img" aria-label="Horarios de los pivotes">';
-  // horario pico 18:00-23:00, same band as on the chart
-  s += '<rect x="'+(pl+72*bw).toFixed(2)+'" y="-4" width="'+(20*bw).toFixed(2)+'" height="'+(H-sp+8)+'" rx="4" fill="#E0A100" fill-opacity="0.10"/>';
+  // horario pico 18:00-23:00, same band as on the chart: hatched background, label on top, strip under the rows
+  { const xa = pl + 72*bw, wd = 20*bw, pk = '#E0A100';
+    s += '<defs><pattern id="pivpk" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="'+pk+'" stroke-width="1.4" stroke-opacity="0.22"/></pattern></defs>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="-16" width="'+wd.toFixed(2)+'" height="'+(H-sp+16)+'" fill="'+pk+'" fill-opacity="0.08"/>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="-16" width="'+wd.toFixed(2)+'" height="'+(H-sp+16)+'" fill="url(#pivpk)"/>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="'+(H-sp+1)+'" width="'+wd.toFixed(2)+'" height="3" fill="'+pk+'"/>';
+    if (wd > 34) s += '<text x="'+(xa+wd/2).toFixed(1)+'" y="-5" text-anchor="middle" font-size="10.5" font-weight="600" fill="#9A6B00">'+(wd > 110 ? '&#9888; Horario pico 18–23' : wd > 60 ? '&#9888; Pico 18–23' : '&#9888;')+'</text>';
+  }
   for (let p=0;p<PIV.n;p++){
     const y0 = p*(rh+sp);
     s += '<text x="'+(pl-6)+'" y="'+(y0+rh/2+3.5)+'" text-anchor="end" font-size="10.5" fill="'+cT+'">P'+(p+1)+'</text>';
