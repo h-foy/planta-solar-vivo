@@ -390,7 +390,7 @@ details.tblbox.opbox .box{padding:10px 8px}
 .tip div.th b{display:block;margin-bottom:3px}
 .tip div span.v{margin-left:auto;padding-left:12px;font-variant-numeric:tabular-nums}
 .tip div span.pc{margin-left:0;padding-left:0;width:42px;text-align:right;color:var(--ink3);font-variant-numeric:tabular-nums}
-.tip div.sub span.nm{padding-left:8px}
+.tip div.tsub span.nm{padding-left:8px}
 .tip div.dv{border-top:1px dashed var(--ink3);margin:5px 0 4px;height:0}
 @media print{.pivbtns,.pivmsg{display:none !important}}
 .tip div.pk{color:#9A6B00;font-weight:600;font-size:.92em;margin:1px 0 3px}
@@ -688,7 +688,7 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     let i = Math.floor((sx-pl)/bw); i = Math.max(0, Math.min(slots-1, i));
     if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible'); if (opt.onHover) opt.onHover(i);
-    const row = (c,name,v,pc,sub) => '<div'+(sub ? ' class="sub"' : '')+'><span class="sw" style="background:'+c+'"></span><span class="nm">'+name+'</span><span class="v">'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span><span class="pc">'+(pc==null ? '' : pc+'&nbsp;%')+'</span></div>';
+    const row = (c,name,v,pc,sub) => '<div'+(sub ? ' class="tsub"' : '')+'><span class="sw" style="background:'+c+'"></span><span class="nm">'+name+'</span><span class="v">'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span><span class="pc">'+(pc==null ? '' : pc+'&nbsp;%')+'</span></div>';
     // two groups: site use = grid + solar used on site; solar production = used on site + injected (percentages add to 100)
     const pair = (a, b, t) => (a==null || b==null || !(t > 0)) ? [null, null] : (k => [k, 100-k])(Math.round(a/t*100));
     const pe = pivEstText(d, i, unit);
