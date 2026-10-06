@@ -386,6 +386,12 @@ details.tblbox.opbox .box{padding:10px 8px}
 .pivmsg.err{color:var(--grid-in)}
 .tip div.th{margin-bottom:2px}
 .tip .pe{font-weight:600;color:var(--ink2);font-size:.95em}
+.tip b{display:inline;margin:0}
+.tip div.th b{display:block;margin-bottom:3px}
+.tip div span.v{margin-left:auto;padding-left:12px;font-variant-numeric:tabular-nums}
+.tip div span.pc{margin-left:0;padding-left:0;width:42px;text-align:right;color:var(--ink3);font-variant-numeric:tabular-nums}
+.tip div.sub span.nm{padding-left:8px}
+.tip div.dv{border-top:1px dashed var(--ink3);margin:5px 0 4px;height:0}
 @media print{.pivbtns,.pivmsg{display:none !important}}
 .tip div.pk{color:#9A6B00;font-weight:600;font-size:.92em;margin:1px 0 3px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tip div.pk{color:#F0C04A}}
@@ -682,10 +688,17 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     let i = Math.floor((sx-pl)/bw); i = Math.max(0, Math.min(slots-1, i));
     if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
     const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible'); if (opt.onHover) opt.onHover(i);
-    const row = (c,name,v) => '<div><span class="sw" style="background:'+c+'"></span><span>'+name+'</span><span>'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span></div>';
+    const row = (c,name,v,pc,sub) => '<div'+(sub ? ' class="sub"' : '')+'><span class="sw" style="background:'+c+'"></span><span class="nm">'+name+'</span><span class="v">'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span><span class="pc">'+(pc==null ? '' : pc+'&nbsp;%')+'</span></div>';
+    // two groups: site use = grid + solar used on site; solar production = used on site + injected (percentages add to 100)
+    const pair = (a, b, t) => (a==null || b==null || !(t > 0)) ? [null, null] : (k => [k, 100-k])(Math.round(a/t*100));
     const pe = pivEstText(d, i, unit);
-    tip.innerHTML = '<div class="th"><b>'+tipLabel(i)+'</b>'+(pe ? '<span class="pe">'+pe+'</span>' : '')+'</div>'+(unit === 'kW' && slots % 96 === 0 && i % 96 >= 72 && i % 96 < 92 ? '<div class="pk">&#9888; Horario pico (18–23)</div>' : '')+row(col('--ink'),'<b>Consumo total del sitio</b>', d.grd[i]==null ? null : (d.onsite[i]||0)+(d.grd[i]||0))+row(cG,'Comprada a la red',d.grd[i])+row(cOn,'Solar consumida en sitio',d.onsite[i])+
-                    row(cI,'Inyectada a la red',d.inj[i])+row(cS,'Producción solar',d.sol[i])+(opt.tipExtra ? opt.tipExtra(i) : '');
+    tip.innerHTML = '<div class="th"><b>'+tipLabel(i)+'</b>'+(pe ? '<span class="pe">'+pe+'</span>' : '')+'</div>'+(unit === 'kW' && slots % 96 === 0 && i % 96 >= 72 && i % 96 < 92 ? '<div class="pk">&#9888; Horario pico (18–23)</div>' : '')+(() => {
+                      const use = d.grd[i]==null ? null : (d.onsite[i]||0)+(d.grd[i]||0), sol = d.sol[i];
+                      const [pG, pO] = pair(d.grd[i], d.onsite[i], use), [pO2, pI] = pair(d.onsite[i], d.inj[i], sol);
+                      let h = row(col('--ink'),'<b>Consumo total del sitio</b>', use) + row(cG,'Comprada a la red',d.grd[i],pG,1) + row(cOn,'Solar consumida en sitio',d.onsite[i],pO,1) +
+                              '<div class="dv"></div>' + row(cS,'<b>Producción solar</b>', sol);
+                      if (sol != null && sol > 0.05) h += row(cOn,'Solar consumida en sitio',d.onsite[i],pO2,1) + row(cI,'Inyectada a la red',d.inj[i],pI,1);
+                      return h; })()+(opt.tipExtra ? opt.tipExtra(i) : '');
     tip.style.display = 'block';
     const px = cx/W*rc.width, tw = tip.offsetWidth;
     tip.style.left = Math.max(0, Math.min(rc.width - tw, px - tw/2)) + 'px';
