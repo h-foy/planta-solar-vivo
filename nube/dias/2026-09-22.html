@@ -685,7 +685,7 @@ if (!D.snapshot && !D.archive) reloadLater();
 // Times are stored per day in pivotes/YYYY-MM-DD.json at the site root ({"date":..,"on":["0101..." x N]}, one 96-char
 // string per pivot, '1' = on in that 15-minute slot). pivotes/config.json holds {"n":10,"kw":140,"api":"https://..."};
 // "api" is the small helper service that checks the edit password and saves the file (the GitHub key never reaches the page).
-const PIV = {n:10, kw:140, api:'', on:null, saved:'[]', loaded:false, edit:false, pend:null, pw:'', msg:'', cls:'', busy:false};
+const PIV = {n:10, kw:140, api:'', on:null, saved:'[]', carry:[], loaded:false, edit:false, pend:null, pw:'', msg:'', cls:'', busy:false};
 const PIV_ROOT = D.archive ? '../../' : '../';
 const pivBlank = () => Array.from({length:PIV.n}, () => new Array(96).fill(false));
 function pivFrom(list){ const a = pivBlank();
@@ -762,6 +762,7 @@ function renderPiv(){
   for (let p=0;p<PIV.n;p++){ const r = PIV.on[p], c = r.filter(Boolean).length; if (!c) continue; tot += c;
     const runs = []; for (let i=0;i<n;i++) if (r[i] && (i === 0 || !r[i-1])){ let j = i; while (j < n && r[j]) j++; runs.push(hhmm(i*15)+'→'+(j < n ? hhmm(j*15) : (D.archive ? '24:00' : 'sigue'))); }
     per.push('<b>P'+(p+1)+'</b> '+runs.join(', ')); }
+  if (PIV.carry && PIV.carry.length && !pivDirty()) h += '<p class="pivsum">Siguen encendidos desde el día anterior (nadie marcó que se apagaron): <b>'+PIV.carry.map(p => 'P'+(p+1)).join(', ')+'</b>.</p>';
   h += '<p class="pivsum">' + (tot
       ? per.join(' &middot; ')
       : 'Todavía no hay horarios de pivotes para este día.') + '</p>';
@@ -855,12 +856,30 @@ window.addEventListener('beforeunload', e => { if (pivDirty()){ e.preventDefault
 (async function pivInit(){
   try { const c = await fetch(PIV_ROOT+'pivotes/config.json?t='+Date.now(), {cache:'no-store'});
     if (c.ok){ const j = await c.json(); if (j.n) PIV.n = Math.max(1, Math.min(20, j.n|0)); if (j.kw) PIV.kw = +j.kw || PIV.kw; if (j.api) PIV.api = String(j.api).replace(/\/+$/,''); } } catch(e) {}
-  let j = null;
-  if (PIV.api){ try { const r = await fetch(PIV.api+'/pivotes?date='+D.date, {cache:'no-store'}); if (r.ok) j = await r.json(); } catch(e) {} }
-  if (!j){ try { const r = await fetch(PIV_ROOT+'pivotes/'+D.date+'.json?t='+Date.now(), {cache:'no-store'}); if (r.ok) j = await r.json(); } catch(e) {} }
-  PIV.on = pivFrom(j && j.on); PIV.saved = JSON.stringify(pivTo(PIV.on)); PIV.pw = pivSs('pivpw'); PIV.loaded = true;
+  const j = await pivFetch(D.date);
+  PIV.on = pivFrom(j && j.on); PIV.carry = [];
+  if (!(j && Array.isArray(j.on) && j.on.length)){
+    // nothing saved for this day: pivots still running at the end of the last saved day keep running
+    // from 00:00 until someone marks them stopped (looks back up to 7 days)
+    let d = D.date;
+    for (let k=0; k<7; k++){
+      const t = new Date(d+'T12:00:00Z'); t.setUTCDate(t.getUTCDate()-1); d = t.toISOString().slice(0,10);
+      const pj = await pivFetch(d);
+      if (pj && Array.isArray(pj.on) && pj.on.length){
+        pj.on.forEach((sx,p) => { if (p < PIV.n && typeof sx === 'string' && sx[95] === '1'){ PIV.on[p].fill(true); PIV.carry.push(p); } });
+        break;
+      }
+    }
+  }
+  PIV.saved = JSON.stringify(pivTo(PIV.on)); PIV.pw = pivSs('pivpw'); PIV.loaded = true;
   draw();
 })();
+async function pivFetch(date){
+  let j = null;
+  if (PIV.api){ try { const r = await fetch(PIV.api+'/pivotes?date='+date, {cache:'no-store'}); if (r.ok) j = await r.json(); } catch(e) {} }
+  if (!j){ try { const r = await fetch(PIV_ROOT+'pivotes/'+date+'.json?t='+Date.now(), {cache:'no-store'}); if (r.ok) j = await r.json(); } catch(e) {} }
+  return j;
+}
 </script>
 </body>
 </html>
