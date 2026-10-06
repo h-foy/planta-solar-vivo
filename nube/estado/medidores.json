@@ -2,16 +2,16 @@
  "medidores": {
   "AGRIM02P": {
    "nombre": "Medidor de la planta solar",
-   "ultima": "2026-10-06 12:45",
+   "ultima": "2026-10-06 13:00",
    "ok": true
   },
   "DAGSR01P": {
    "nombre": "Medidor de entrada (red)",
    "ultima": "2026-10-06 11:30",
    "ok": false,
-   "intento": "2026-10-06 12:57",
+   "intento": "2026-10-06 13:01",
    "error": "el equipo de comunicación rechazó la conexión (ocupado o sin servicio)"
   }
  },
- "actualizado": "2026-10-06 12:57"
+ "actualizado": "2026-10-06 13:01"
 }
