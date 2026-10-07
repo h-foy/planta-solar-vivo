@@ -1033,8 +1033,12 @@ function pivHover(i, p, fromChart){
 }
 function renderOp(){
   const box = document.getElementById('opBox'); if (!box || !PIV.loaded) return;
-  let named = 0; for (const r of PIV.on) if (r.some(Boolean)) named++;
-  document.getElementById('opSub').textContent = named ? named+' con horario' : '';
+  // live page: pivots running in the current quarter-hour; past days: pivots that ran at some point that day
+  const cur = Math.min(95, Math.max(0, D.n || 0));
+  let cnt = 0; for (const r of PIV.on) if (D.archive ? r.some(Boolean) : r[cur]) cnt++;
+  document.getElementById('opSub').textContent = D.archive
+    ? (cnt ? cnt+(cnt === 1 ? ' pivote funcionó' : ' pivotes funcionaron') : '')
+    : (cnt ? cnt+' en marcha ahora' : 'ninguno en marcha');
   if (!box.open) return;
   if (mode5 && F){ renderPiv5(); return; }
   renderPiv();
