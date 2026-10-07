@@ -762,7 +762,9 @@ setMode(mode5);
 // 15-minute chart in kW: average power of each interval = kWh x 4
 const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
 function draw(){
-  if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip, {ticks:F.ticks, seps:F.seps, unit:'kW'});
+  const pivOn = typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open;
+  if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip,
+    Object.assign({ticks:F.ticks, seps:F.seps, unit:'kW'}, pivOn ? {onHover: i => pivHover(i, -1, true)} : {}));
   else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15),
     Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {onHover: i => pivHover(i, -1, true)} : {}));
   if (typeof renderOp === 'function') renderOp();
@@ -950,7 +952,7 @@ function renderPiv(){
   const cOn = col('--onsite'), cStop = col('--grid-in'), cOff = col('--grid'), cT = col('--ink3');
   const nowSlot = D.archive ? 96 : Math.max(0, D.n || 0);   // live page: slots after the last reading are still to come
   const TOP = 22, BOT = 18;
-  PIV.g = {pl, bw, SW, H, TOP, BOT, rh, sp, cbw: (W-34-pr)/n};
+  PIV.g = {pl, bw, SW, H, TOP, BOT, rh, sp, cbw: (W-34-pr)/n, n, on: p => PIV.on[p], lab: i => hhmm(i*15)+'–'+hhmm(i*15+15)};
   let s = '<svg class="pivsvg" viewBox="0 '+(-TOP)+' '+SW+' '+(H+TOP+BOT)+'" width="100%" style="display:block;touch-action:pan-y" role="img" aria-label="Horarios de los pivotes">';
   // horario pico 18:00-23:00, same band as on the chart: hatched background, label on top, strip under the rows
   { const xa = pl + 72*bw, wd = 20*bw, pk = '#E0A100';
@@ -1003,7 +1005,7 @@ function renderPiv(){
   const move = ev => { const t = ev.touches ? ev.touches[0] : ev, r = svg.getBoundingClientRect(), g = PIV.g;
     const x = (t.clientX - r.left) * g.SW / r.width, y = (t.clientY - r.top) * (g.H + g.TOP + g.BOT) / r.height - g.TOP;
     const i = Math.floor((x - g.pl) / g.bw), p = Math.floor(y / (g.rh + g.sp));
-    pivHover(i >= 0 && i < 96 ? i : -1, p >= 0 && p < PIV.n ? p : -1, false); };
+    pivHover(i >= 0 && i < g.n ? i : -1, p >= 0 && p < PIV.n ? p : -1, false); };
   svg.addEventListener('mousemove', move); svg.addEventListener('mouseleave', () => pivHover(-1, -1, false));
   svg.addEventListener('touchstart', move, {passive:true}); svg.addEventListener('touchmove', move, {passive:true});
   const pw = document.getElementById('pivPw');
@@ -1018,8 +1020,8 @@ function pivHover(i, p, fromChart){
     if (!fromChart && xl) xl.setAttribute('visibility','hidden'); return; }
   const cx = g.pl + i*g.bw + g.bw/2;
   ln.setAttribute('x1', cx); ln.setAttribute('x2', cx); ln.setAttribute('visibility','visible');
-  let txt = hhmm(i*15)+'–'+hhmm(i*15+15);
-  if (p >= 0){ const r = PIV.on[p], st = r[i] && (i === 0 || !r[i-1]), sp2 = !r[i] && i > 0 && r[i-1];
+  let txt = g.lab(i);
+  if (p >= 0){ const r = g.on(p), st = r[i] && (i === 0 || !r[i-1]), sp2 = !r[i] && i > 0 && r[i-1];
     txt = 'P'+(p+1)+'  ·  '+txt + (st ? '  ·  encendido' : sp2 ? '  ·  apagado' : r[i] ? '  ·  funcionando' : ''); }
   const t = lab.querySelector('text'), rc = lab.querySelector('rect');
   t.textContent = txt;
@@ -1034,13 +1036,110 @@ function renderOp(){
   let named = 0; for (const r of PIV.on) if (r.some(Boolean)) named++;
   document.getElementById('opSub').textContent = named ? named+' con horario' : '';
   if (!box.open) return;
-  if (mode5 && F){ document.getElementById('piv').innerHTML = '<p class="pivsum">Los horarios de los pivotes se ven con el gráfico en la vista <b>Día</b>.</p>'; return; }
+  if (mode5 && F){ renderPiv5(); return; }
   renderPiv();
 }
-async function pivPost(path, body){
-  const r = await fetch(PIV.api + path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  let j = {}; try { j = await r.json(); } catch(e) {}
-  return {status:r.status, j};
+// ---- 5-day view: one row per pivot across the same 5 days as the chart (read-only; times are edited in the Día view) ----
+// Earlier days come from their saved files; a day with nothing saved inherits the pivots still running at the end of the
+// day before (same rule as the Día view). Today uses the times currently loaded above.
+const PIV5 = {days:null, loading:false};
+const pivHas = j => !!(j && Array.isArray(j.on) && j.on.length);
+async function piv5Load(){
+  if (PIV5.days || PIV5.loading || !F) return;
+  PIV5.loading = true;
+  const dates = (D.hist || []).map(h => h.date);
+  const got = await Promise.all(dates.map(d => pivFetch(d)));
+  let prev = null;
+  if (dates.length && !pivHas(got[0])){
+    let d = dates[0];
+    for (let k=0; k<7; k++){ const t = new Date(d+'T12:00:00Z'); t.setUTCDate(t.getUTCDate()-1); d = t.toISOString().slice(0,10);
+      const pj = await pivFetch(d); if (pivHas(pj)){ prev = pivFrom(pj.on); break; } }
+  }
+  PIV5.days = dates.map((iso, k) => {
+    let on, carry = [];
+    if (pivHas(got[k])) on = pivFrom(got[k].on);
+    else { on = pivBlank(); if (prev) prev.forEach((r,p) => { if (r[95]){ on[p].fill(true); carry.push(p); } }); }
+    prev = on; return {date:iso, on, carry, saved:pivHas(got[k])};
+  });
+  PIV5.loading = false; draw();
+}
+function renderPiv5(){
+  const el = document.getElementById('piv');
+  if (!PIV5.days){ el.innerHTML = '<p class="pivsum">Cargando horarios de los pivotes de los últimos 5 días…</p>'; piv5Load(); return; }
+  const days = PIV5.days.concat([{date:D.date, on:PIV.on, carry:PIV.carry, today:true}]);
+  const nd = days.length, n = nd*96;
+  // same geometry as chart('c15') in the 5-day view, shifted by the horizontal offset between the two boxes
+  const c15 = document.getElementById('c15');
+  const W = Math.max(300, Math.round(c15.clientWidth || 340));
+  const off = c15.getBoundingClientRect().left - el.getBoundingClientRect().left, SW = Math.max(W, Math.round(el.clientWidth || W));
+  const pl = off + 34, pr = 6, bw = (W-34-pr)/n;
+  const rh = 12, sp = 4, H = PIV.n*(rh+sp), TOP = 22, BOT = 18;
+  const nowSlot = D.archive ? n : (nd-1)*96 + Math.max(0, D.n || 0);
+  const cOn = col('--onsite'), cOff = col('--grid'), cT = col('--ink3'), pk = '#E0A100';
+  const row = p => { const a = []; for (const d of days) for (let i=0;i<96;i++) a.push(!!d.on[p][i]); return a; };
+  const R = []; for (let p=0;p<PIV.n;p++) R.push(row(p));
+  const peak = i => i % 96 >= 72 && i % 96 < 92;
+  const lab = i => { const t = new Date(days[Math.floor(i/96)].date+'T12:00:00'), h = i % 96;
+    return t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric'}).replace('.','')+' · '+hhmm(h*15)+'–'+hhmm(h*15+15); };
+  PIV.g = {pl, bw, SW, H, TOP, BOT, rh, sp, cbw: bw, n, on: p => R[p], lab};
+  let s = '<svg class="pivsvg" viewBox="0 '+(-TOP)+' '+SW+' '+(H+TOP+BOT)+'" width="100%" style="display:block;touch-action:pan-y" role="img" aria-label="Horarios de los pivotes, últimos 5 días">';
+  s += '<defs><pattern id="piv5pk" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="'+pk+'" stroke-width="1.4" stroke-opacity="0.22"/></pattern></defs>';
+  for (let p=0;p<PIV.n;p++){ const y0 = p*(rh+sp);
+    s += '<text x="'+(pl-6)+'" y="'+(y0+rh/2+3.5)+'" text-anchor="end" font-size="10.5" fill="'+cT+'">P'+(p+1)+'</text>';
+    s += '<rect x="'+pl.toFixed(2)+'" y="'+y0+'" width="'+(n*bw).toFixed(2)+'" height="'+rh+'" rx="2" fill="'+cOff+'"/>'; }
+  // horario pico 18:00-23:00 of each day, same band as on the chart
+  for (let b=0; b<n; b+=96){ const xa = pl + (b+72)*bw, wd = 20*bw;
+    s += '<rect x="'+xa.toFixed(2)+'" y="-16" width="'+wd.toFixed(2)+'" height="'+(H-sp+16)+'" fill="'+pk+'" fill-opacity="0.08"/>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="-16" width="'+wd.toFixed(2)+'" height="'+(H-sp+16)+'" fill="url(#piv5pk)"/>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="'+(H-sp+1)+'" width="'+wd.toFixed(2)+'" height="3" fill="'+pk+'"/>'; }
+  // running stretches drawn as one bar each; split where the colour or the "still to come" shading changes
+  for (let p=0;p<PIV.n;p++){ const y0 = p*(rh+sp), r = R[p];
+    let i = 0;
+    while (i < n){
+      if (!r[i]){ i++; continue; }
+      const k = (peak(i) ? 1 : 0) + (i >= nowSlot ? 2 : 0); let j = i + 1;
+      while (j < n && r[j] && ((peak(j) ? 1 : 0) + (j >= nowSlot ? 2 : 0)) === k && j % 96 !== 0) j++;
+      s += '<rect x="'+(pl+i*bw).toFixed(2)+'" y="'+y0+'" width="'+Math.max(1, (j-i)*bw).toFixed(2)+'" height="'+rh+'" fill="'+(k & 1 ? pk : cOn)+'"'+(k & 2 ? ' fill-opacity="0.35"' : '')+'/>';
+      i = j;
+    } }
+  for (let d=1; d<nd; d++){ const x = pl + d*96*bw;
+    s += '<line x1="'+x.toFixed(2)+'" x2="'+x.toFixed(2)+'" y1="-16" y2="'+(H-sp)+'" stroke="'+col('--axis')+'" stroke-width="1" stroke-dasharray="2 3"/>'; }
+  if (!D.archive && nowSlot < n){ const x = pl + nowSlot*bw;
+    s += '<line x1="'+x.toFixed(2)+'" x2="'+x.toFixed(2)+'" y1="-4" y2="'+(H-sp)+'" stroke="'+col('--solar')+'" stroke-width="1.5"/>'; }
+  days.forEach((d, k) => s += '<text x="'+(pl+(k*96+48)*bw).toFixed(1)+'" y="'+(H+12)+'" font-size="10.5" fill="'+cT+'" text-anchor="middle">'+dname(d.date)+'</text>');
+  s += '<line id="pivX" x1="0" x2="0" y1="-4" y2="'+(H-sp)+'" stroke="'+cT+'" stroke-width="1" stroke-dasharray="3 3" visibility="hidden" pointer-events="none"/>';
+  s += '<g id="pivT" visibility="hidden" pointer-events="none"><rect x="0" y="'+(-TOP+1)+'" height="17" rx="5" fill="'+col('--ink')+'"/>' +
+       '<text x="0" y="'+(-TOP+13.5)+'" font-size="11.5" font-weight="600" fill="'+col('--card')+'" text-anchor="middle"></text></g>';
+  s += '</svg>';
+  let h = '<div class="pivhd"><span><b>Pivotes de riego · últimos 5 días</b> <span class="pivkey"><i style="background:var(--onsite)"></i>encendido <i style="background:'+pk+';margin-left:8px"></i>encendido en horario pico</span></span></div>' + s;
+  // per-day totals; today only counts up to the last reading
+  const fh = x => x.toLocaleString('es-AR',{maximumFractionDigits:2});
+  let tb = '<table style="margin-top:10px"><thead><tr><th>Día</th><th>Horas-pivote</th><th>kWh estimados</th><th>Horas en pico</th><th>Pivotes</th></tr></thead><tbody>';
+  const notes = [];
+  days.forEach((d, k) => { let sl = 0, pks = 0, used = 0; const lim = d.today && !D.archive ? Math.max(0, D.n || 0) : 96;
+    for (let p=0;p<PIV.n;p++){ let c = 0; for (let i=0;i<lim;i++) if (d.on[p][i]){ c++; if (i >= 72 && i < 92) pks++; } sl += c; if (c) used++; }
+    tb += '<tr><td'+(d.today ? ' class="today"' : '')+'>'+dname(d.date)+(d.today && !D.archive ? ' (hasta '+D.last+')' : '')+'</td><td>'+fh(sl/4)+'</td><td>'+fmt(sl/4*PIV.kw,0)+'</td><td>'+fh(pks/4)+'</td><td>'+used+'</td></tr>';
+    if (d.carry && d.carry.length && !(d.today && pivDirty())) notes.push(dname(d.date)+': '+d.carry.map(p => 'P'+(p+1)).join(', ')); });
+  h += tb + '</tbody></table>';
+  if (notes.length) h += '<p class="pivsum">Siguen encendidos desde el día anterior (nadie marcó que se apagaron) &mdash; '+notes.join(' &middot; ')+'.</p>';
+  h += '<p class="pivsum">kWh estimados = horas-pivote &times; '+fmt(PIV.kw,0)+' kW por pivote. Los horarios se cargan y corrigen en la vista <b>'+(D.archive ? 'Día' : 'Hoy')+'</b>.</p>';
+  el.innerHTML = h;
+  const svg = el.querySelector('.pivsvg');
+  const move = ev => { const t = ev.touches ? ev.touches[0] : ev, r = svg.getBoundingClientRect(), g = PIV.g;
+    const x = (t.clientX - r.left) * g.SW / r.width, y = (t.clientY - r.top) * (g.H + g.TOP + g.BOT) / r.height - g.TOP;
+    const i = Math.floor((x - g.pl) / g.bw), p = Math.floor(y / (g.rh + g.sp));
+    pivHover(i >= 0 && i < g.n ? i : -1, p >= 0 && p < PIV.n ? p : -1, false); };
+  svg.addEventListener('mousemove', move); svg.addEventListener('mouseleave', () => pivHover(-1, -1, false));
+  svg.addEventListener('touchstart', move, {passive:true}); svg.addEventListener('touchmove', move, {passive:true});
+}
+// never wait forever for the save service: give up after 20 s (the caller then checks what actually got saved)
+async function pivPost(path, body, ms){
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms || 20000);
+  try {
+    const r = await fetch(PIV.api + path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:ctl.signal});
+    let j = {}; try { j = await r.json(); } catch(e) {}
+    return {status:r.status, j};
+  } finally { clearTimeout(t); }
 }
 async function pivAction(a){
   PIV.msg = ''; PIV.cls = '';
@@ -1053,10 +1152,10 @@ async function pivAction(a){
     const pw = (document.getElementById('pivPw') || {}).value || '';
     if (!pw){ PIV.msg = 'Escriba la contraseña.'; PIV.cls = 'err'; }
     else { PIV.busy = true; draw();
-      try { const r = await pivPost('/check', {password:pw});
+      try { const r = await pivPost('/check', {password:pw}, 15000);
         if (r.status === 200){ PIV.pw = pw; pivSs('pivpw', pw); }
         else { PIV.msg = r.status === 401 ? 'Contraseña incorrecta.' : 'No se pudo verificar la contraseña ('+r.status+').'; PIV.cls = 'err'; }
-      } catch(e){ PIV.msg = 'Sin conexión con el servicio de guardado.'; PIV.cls = 'err'; }
+      } catch(e){ PIV.msg = 'Sin respuesta del servicio de guardado. Intente de nuevo.'; PIV.cls = 'err'; }
       PIV.busy = false; }
   } else if (a === 'save'){
     PIV.busy = true; PIV.pend = null; draw();
@@ -1065,7 +1164,13 @@ async function pivAction(a){
       if (r.status === 200){ PIV.saved = JSON.stringify(on); PIV.edit = false; PIV.msg = 'Guardado &#10003;'; PIV.cls = 'ok'; }
       else if (r.status === 401){ PIV.pw = ''; pivSs('pivpw', null); PIV.msg = 'La contraseña no es válida; ingrésela de nuevo y vuelva a Guardar.'; PIV.cls = 'err'; }
       else { PIV.msg = 'No se pudo guardar ('+(r.j.error || r.status)+'). Intente de nuevo.'; PIV.cls = 'err'; }
-    } catch(e){ PIV.msg = 'Sin conexión con el servicio de guardado. Intente de nuevo.'; PIV.cls = 'err'; }
+    } catch(e){
+      // no answer (timeout or dropped connection): the save may still have gone through, so read the day back and compare
+      let ok = false;
+      try { const j = await pivFetch(D.date); ok = !!(j && Array.isArray(j.on) && JSON.stringify(j.on) === JSON.stringify(on)); } catch(e2) {}
+      if (ok){ PIV.saved = JSON.stringify(on); PIV.edit = false; PIV.msg = 'Guardado &#10003;'; PIV.cls = 'ok'; }
+      else { PIV.msg = 'El servicio de guardado no respondió y los horarios no quedaron guardados. Vuelva a tocar Guardar.'; PIV.cls = 'err'; }
+    }
     PIV.busy = false;
   }
   draw();
@@ -1108,7 +1213,9 @@ window.addEventListener('beforeunload', e => { if (pivDirty()){ e.preventDefault
 })();
 async function pivFetch(date){
   let j = null;
-  if (PIV.api){ try { const r = await fetch(PIV.api+'/pivotes?date='+date, {cache:'no-store'}); if (r.ok) j = await r.json(); } catch(e) {} }
+  if (PIV.api){ const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+    try { const r = await fetch(PIV.api+'/pivotes?date='+date, {cache:'no-store', signal:ctl.signal}); if (r.ok) j = await r.json(); } catch(e) {}
+    clearTimeout(t); }
   if (!j){ try { const r = await fetch(PIV_ROOT+'pivotes/'+date+'.json?t='+Date.now(), {cache:'no-store'}); if (r.ok) j = await r.json(); } catch(e) {} }
   return j;
 }
