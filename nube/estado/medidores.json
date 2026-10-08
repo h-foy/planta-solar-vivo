@@ -2,14 +2,14 @@
  "medidores": {
   "AGRIM02P": {
    "nombre": "Medidor de la planta solar",
-   "ultima": "2026-10-08 02:00",
+   "ultima": "2026-10-08 02:15",
    "ok": true
   },
   "DAGSR01P": {
    "nombre": "Medidor de entrada (red)",
-   "ultima": "2026-10-08 02:00",
+   "ultima": "2026-10-08 02:15",
    "ok": true
   }
  },
- "actualizado": "2026-10-08 02:01"
+ "actualizado": "2026-10-08 02:15"
 }
