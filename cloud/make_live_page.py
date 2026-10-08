@@ -108,6 +108,8 @@ def camera_url():
                 url = next((ln.strip() for ln in f if ln.strip() and not ln.startswith('#')), '')
         except FileNotFoundError:
             pass
+    if url.lower() == 'dmss':      # live video only in Dahua's DMSS app: the page shows how to open it
+        return 'dmss'
     return url if url.startswith('https://') else ''
 
 
@@ -778,6 +780,20 @@ draw();
   if (!D.cam) {
     btn.disabled = true;
     document.getElementById('camLabel').textContent = 'Cámara en vivo: próximamente';
+    return;
+  }
+  // 'dmss' in camara.txt: live video is watched in Dahua's DMSS app with the view-only login, so the button
+  // opens a short how-to with the app links instead of showing anything on the page
+  if (D.cam.toLowerCase() === 'dmss') {
+    ratio.hidden = true;
+    document.getElementById('camSub').textContent = 'Planta Agritur · app DMSS';
+    document.getElementById('camNote').innerHTML =
+      'El video en vivo se ve en la app <b>DMSS</b> de Dahua (gratis), con el usuario de solo lectura de la cámara. ' +
+      'Abrí DMSS y elegí la cámara <b>Agritur</b>. ¿No tenés la app? ' +
+      '<a href="https://apps.apple.com/app/dmss/id1493268178" target="_blank" rel="noopener">iPhone</a> · ' +
+      '<a href="https://play.google.com/store/apps/details?id=com.mm.android.DMSS" target="_blank" rel="noopener">Android</a>';
+    btn.addEventListener('click', () => { box.hidden = !box.hidden; btn.setAttribute('aria-expanded', String(!box.hidden)); });
+    document.getElementById('camClose').addEventListener('click', () => { box.hidden = true; btn.setAttribute('aria-expanded','false'); btn.focus(); });
     return;
   }
   const photo = /\.(jpe?g|png)(\?.*)?$/i.test(D.cam);
