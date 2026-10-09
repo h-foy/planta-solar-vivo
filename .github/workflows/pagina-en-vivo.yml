@@ -35,6 +35,17 @@ jobs:
           TZ: America/Argentina/Buenos_Aires
         run: python cloud/run_cloud.py
 
+      - name: Camera photo
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          CAM_FTP_HOST: ${{ secrets.CAM_FTP_HOST }}
+          CAM_FTP_USER: ${{ secrets.CAM_FTP_USER }}
+          CAM_FTP_PASS: ${{ secrets.CAM_FTP_PASS }}
+          CAM_KEY: ${{ secrets.CAM_KEY }}
+          TZ: America/Argentina/Buenos_Aires
+        run: python cloud/cam_fetch.py
+
       - name: Publish
         env:
           TZ: America/Argentina/Buenos_Aires
