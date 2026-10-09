@@ -583,11 +583,28 @@ draw();
     document.getElementById('camNote').textContent = 'Última foto de la cámara (se actualiza cada 15 minutos).';
   }
   let timer = null;
+  // our own Worker also says when the photo was taken: show it, and flag a photo over 40 minutes old
+  const photoTime = async () => {
+    let base; try { base = new URL(D.cam); } catch (e) { return; }
+    if (!base.hostname.endsWith('.workers.dev')) return;
+    try {
+      const r = await fetch(base.origin + '/foto', { cache: 'no-store' });
+      const j = r.ok ? await r.json() : {};
+      if (!j.hora) return;
+      const t = new Date(j.hora);
+      const hhmm = t.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires',
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const old = (Date.now() - t.getTime()) > 40 * 60000;
+      const note = document.getElementById('camNote');
+      note.textContent = 'Foto del ' + hhmm + (old ? ' — la cámara no envía fotos nuevas hace un rato.' : ' (se actualiza cada 15 minutos).');
+      note.style.color = old ? '#b45309' : '';
+    } catch (e) {}
+  };
   const loadPhoto = () => {
     const sep = D.cam.includes('?') ? '&' : '?';
     const img = new Image();
     img.alt = 'Última foto de la cámara de la planta';
-    img.onload = () => { ratio.innerHTML = ''; ratio.appendChild(img); };
+    img.onload = () => { ratio.innerHTML = ''; ratio.appendChild(img); photoTime(); };
     img.onerror = () => { if (!ratio.querySelector('img'))
       ratio.innerHTML = '<div class="msg">La foto todavía no está disponible. Probá de nuevo en unos minutos.</div>'; };
     img.src = D.cam + sep + 't=' + Date.now();     // skip any cached copy
