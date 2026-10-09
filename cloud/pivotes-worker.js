@@ -10,6 +10,13 @@
 //   EDIT_PASSWORD  (secret)  the password people type to edit pivot times
 //   ALLOW_ORIGIN   (text, optional)  defaults to https://h-foy.github.io
 //   REPO           (text, optional)  defaults to h-foy/planta-solar-vivo
+//   CAM_KEY        (secret)  shared key; GitHub's cam_fetch.py sends it with each camera photo
+//   CAM            (KV namespace binding)  holds the single latest camera photo
+//
+// Camera photo:
+//   GET  /foto.jpg                          -> the latest photo (only one is ever kept)
+//   GET  /foto                              -> {hora} time of that photo (UTC, ISO)
+//   PUT  /foto   (X-Cam-Key, X-Foto-Hora)   -> replaces the photo
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SLOTS = /^[01]{96}$/;
@@ -52,6 +59,32 @@ export default {
       const file = await r.json();
       try { return json(JSON.parse(atob(file.content.replace(/\n/g, '')))); }
       catch { return json({ date, on: [] }); }
+    }
+
+    // ---- camera photo: exactly one kept, each upload overwrites the previous one ----
+    if (url.pathname === '/foto.jpg' && req.method === 'GET') {
+      if (!env.CAM) return new Response('sin configurar', { status: 500 });
+      const { value, metadata } = await env.CAM.getWithMetadata('latest', { type: 'arrayBuffer' });
+      if (!value) return new Response('todavía no hay foto', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+      return new Response(value, { headers: {
+        'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store',
+        'X-Foto-Hora': (metadata && metadata.hora) || '', 'Access-Control-Allow-Origin': '*' } });
+    }
+    if (url.pathname === '/foto' && req.method === 'GET') {
+      if (!env.CAM) return json({ error: 'sin configurar' }, 500);
+      const { metadata } = await env.CAM.getWithMetadata('latest', { type: 'stream' });
+      return json({ hora: (metadata && metadata.hora) || null });
+    }
+    if (url.pathname === '/foto' && req.method === 'PUT') {
+      if (!env.CAM || !env.CAM_KEY) return json({ error: 'sin configurar' }, 500);
+      if (!(await sameText(req.headers.get('X-Cam-Key') || '', env.CAM_KEY))) return json({ error: 'clave incorrecta' }, 401);
+      const img = await req.arrayBuffer();
+      const head = new Uint8Array(img.slice(0, 2));
+      if (img.byteLength < 1000 || img.byteLength > 5e6 || head[0] !== 0xff || head[1] !== 0xd8)
+        return json({ error: 'foto inválida' }, 400);
+      const hora = (req.headers.get('X-Foto-Hora') || new Date().toISOString()).slice(0, 25);
+      await env.CAM.put('latest', img, { metadata: { hora } });
+      return json({ ok: true, hora });
     }
 
     if (req.method !== 'POST' || !['/check', '/pivotes'].includes(url.pathname)) return json({ error: 'no encontrado' }, 404);
