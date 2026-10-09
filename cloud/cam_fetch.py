@@ -9,7 +9,7 @@ Secrets provided by the workflow (never stored in this public repository):
   CAM_FTP_HOST, CAM_FTP_USER, CAM_FTP_PASS   the InfinityFree FTP login
   CAM_KEY                                    shared key the Worker checks before accepting a photo
 Optional:
-  CAM_FTP_DIR   folder the camera uploads into (default /htdocs/cam)
+  CAM_FTP_DIR   folder the camera uploads into (default /htdocs)
   CAM_API       Worker address (default: "api" in pivotes/config.json)
 
 Never fails the workflow: problems are printed and the script exits 0.
@@ -79,7 +79,7 @@ def main():
     user = os.environ.get('CAM_FTP_USER', '').strip()
     pw = os.environ.get('CAM_FTP_PASS', '')
     key = os.environ.get('CAM_KEY', '')
-    top = os.environ.get('CAM_FTP_DIR', '').strip() or '/htdocs/cam'
+    top = os.environ.get('CAM_FTP_DIR', '').strip() or '/htdocs'
     if not (host and user and pw and key):
         say('sin configurar (faltan secretos CAM_*), nada que hacer'); return
 
