@@ -275,7 +275,7 @@ W.use = W.onsite + W.grd;
 // ---- header ----
 const dObj = new Date(D.date+'T12:00:00');
 const dTxt = dObj.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-document.getElementById('sub').innerHTML = dTxt + (D.archive ? ' &middot; <b>día completo</b>' : ' &middot; lecturas hasta las <b>'+D.last+'</b>');
+document.getElementById('sub').innerHTML = dTxt + (D.archive ? (ns < n ? ' &middot; <b>día incompleto</b>: '+(ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares')+' (el medidor de la planta solar no respondió; se completará solo)' : ' &middot; <b>día completo</b>') : ' &middot; lecturas hasta las <b>'+D.last+'</b>');
 if (D.archive){
   document.querySelector('header h1').textContent = 'Planta solar · informe del día';
   document.title = 'Planta Solar · ' + D.date;
@@ -709,7 +709,7 @@ for (let h=0;h<HR.length;h++){
 const tsum = TT;
 t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(tsum.sol)+'</td><td>'+fmt(tsum.onsite)+'</td><td>'+fmt(tsum.grd)+'</td><td>'+fmt(tsum.inj)+'</td><td>'+fmt(tsum.use)+'</td></tr></tfoot>';
 document.getElementById('tbl').innerHTML = t;
-document.getElementById('tblSub').textContent = 'kWh por hora · ' + (D.archive ? 'día completo' : 'hasta las '+D.last);
+document.getElementById('tblSub').textContent = 'kWh por hora · ' + (D.archive ? (ns < n ? 'solar hasta las '+(D.solLast||'00:00') : 'día completo') : 'hasta las '+D.last);
 { const tb = document.getElementById('tblBox');
   tb.addEventListener('toggle', () => { document.getElementById('tblLabel').textContent = tb.open ? 'Tabla por hora (abierta)' : 'Ver tabla por hora'; }); }
 
