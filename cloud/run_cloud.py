@@ -150,11 +150,15 @@ def _update_status(now, read_output=None):
         say(f'Meter status: ' + '; '.join(f'{m} {"ok" if v.get("ok") else "FALLA"} (última {v.get("ultima")})' for m, v in meters.items()))
 
 
+def has_file(meter, day):
+    return os.path.exists(os.path.join(DATA, f'{day:%Y}', f'{meter}_{day:%Y%m%d}.PRN'))
+
+
 def archived(day):
     folder = os.path.join(DATA, f'{day:%Y}')
     if os.path.exists(os.path.join(folder, f'{day:%Y%m%d}_incompleto.txt')):
         return True                                       # tried before; the meters don't have the whole day
-    return all(os.path.exists(os.path.join(folder, f'{m}_{day:%Y%m%d}.PRN')) for m in METERS)
+    return all(has_file(m, day) for m in METERS)
 
 
 def main():
@@ -190,19 +194,24 @@ def main():
         f'{", ".join(d.isoformat() for d in missing) or "none"}')
 
     if missing:
+        # days still without the grid meter's file first, so one silent meter never holds up the other's archive
+        missing.sort(key=lambda d: (has_file('DAGSR01P', d), -d.toordinal()))
         day = missing[0]
-        if step(f'read {day}', ['sl7000_prn.py', '--date', day.isoformat(), '--outdir', OUT]):
-            os.makedirs(os.path.join(DATA, f'{day:%Y}'), exist_ok=True)
-            for m in METERS:
-                src = os.path.join(OUT, f'{m}_{day:%Y%m%d}.PRN')
-                if os.path.exists(src):           # only complete days get a file without _hasta_
-                    shutil.copy2(src, os.path.join(DATA, f'{day:%Y}', os.path.basename(src)))
-            # yesterday's last reading can lag a little after midnight: keep trying it until 02:00;
-            # any other day that still comes back incomplete is noted so it is not read again every run
-            if not archived(day) and (day < yday or now.hour >= 2):
-                with open(os.path.join(DATA, f'{day:%Y}', f'{day:%Y%m%d}_incompleto.txt'), 'w') as f:
-                    f.write('Los medidores no devolvieron el día completo; se omite del gráfico de 5 días.\n')
-                say(f'{day}: incomplete in the meters, noted and skipped from now on')
+        lacking = [m for m in METERS if not has_file(m, day)]
+        ok = step(f'read {day}', ['sl7000_prn.py', '--date', day.isoformat(), '--outdir', OUT,
+                                  *sum((['--meter', m] for m in lacking), [])])
+        os.makedirs(os.path.join(DATA, f'{day:%Y}'), exist_ok=True)
+        for m in lacking:                         # keep every meter that answered, even if the other did not
+            src = os.path.join(OUT, f'{m}_{day:%Y%m%d}.PRN')
+            if os.path.exists(src):               # only complete days get a file without _hasta_
+                shutil.copy2(src, os.path.join(DATA, f'{day:%Y}', os.path.basename(src)))
+        # yesterday's last reading can lag a little after midnight: keep trying it until 02:00;
+        # a day the meters answered for but still returned short is noted so it is not read again every run
+        # (a meter that did not answer at all is simply tried again on the next run)
+        if ok and not archived(day) and (day < yday or now.hour >= 2):
+            with open(os.path.join(DATA, f'{day:%Y}', f'{day:%Y%m%d}_incompleto.txt'), 'w') as f:
+                f.write('Los medidores no devolvieron el día completo; se omite del gráfico de 5 días.\n')
+            say(f'{day}: incomplete in the meters, noted and skipped from now on')
     if not (due.time() == dt.time(0, 0)):
         step('read today', ['sl7000_prn.py', '--date', 'today', '--outdir', OUT])
         update_status(now, LAST_OUTPUT.get('read today', ''))

@@ -25,6 +25,7 @@ sys.path.insert(0, HERE)
 from parse import parse  # noqa: E402
 from make_excel import build_month_workbooks  # noqa: E402
 
+PARTIAL_SUFFIX = '_solar_parcial.json'
 PAT = re.compile(r'(AGRIM02P|DAGSR01P)_(\d{8})(?:_hasta_(\d{4}))?\.PRN$', re.I)
 
 
@@ -65,29 +66,23 @@ def previous_solar(prev_page, date_iso):
 
 
 def history(dirs, today, ndays=4):
-    """15-minute kWh values (96 per day) for the ndays complete days before `today` (YYYYMMDD), oldest first.
-    Looks for full-day files (no _hasta_) in the given folders and their subfolders."""
-    files = {}
-    for d in dirs:
-        if not d or not os.path.isdir(d):
-            continue
-        for p in glob.glob(os.path.join(d, '**', '*.PRN'), recursive=True):
-            m = PAT.search(os.path.basename(p))
-            if m and not m.group(3) and '_discarded' not in p and 'parciales' not in p:
-                files.setdefault(m.group(2), {})[m.group(1).upper()] = p
+    """15-minute kWh values (96 per day) for the ndays finished days before `today` (YYYYMMDD), oldest first.
+    A day counts once the grid meter (DAGSR01P) has its full-day file; the solar meter's values are
+    used as far as they go (full file, else the partial saved when the day ended) and are None after that."""
+    days = grid_days(dirs)
     t0 = dt.datetime.strptime(today, '%Y%m%d')
     out = []
     for k in range(ndays, 0, -1):
         day = (t0 - dt.timedelta(days=k)).strftime('%Y%m%d')
-        pair = files.get(day, {})
-        if len(pair) < 2:
+        if day not in days:
             continue
-        ag, ds = parse(pair['AGRIM02P']), parse(pair['DAGSR01P'])
-        n = min(len(ag), len(ds), 96)
+        ds = parse(days[day]['DAGSR01P'])
+        n = min(len(ds), 96)
+        sol = day_solar(days[day])
         vals = {'sol': [], 'inj': [], 'grd': []}
         for i in range(96):
             ok = i < n
-            vals['sol'].append(round(ag[i][0], 3) if ok else None)
+            vals['sol'].append(sol[i] if ok and i < len(sol) else None)
             vals['inj'].append(round(ds[i][0], 3) if ok else None)
             vals['grd'].append(round(ds[i][1], 3) if ok else None)
         out.append({'date': f'{day[:4]}-{day[4:6]}-{day[6:]}', **vals})
@@ -149,6 +144,8 @@ def build(src, dest, snapshot=False, hist_dirs=(), prev_page=None):
         html = html.strip() + '\n'
     os.makedirs(dest, exist_ok=True)
     out = os.path.join(dest, 'index.html')
+    if not snapshot and hist_dirs:
+        save_solar_partial(out, date_iso, [d for d in hist_dirs if d])
     tmp = out + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:
         f.write(html)
@@ -164,8 +161,7 @@ def render(data):
     return TEMPLATE.replace('/*DATA*/null', json.dumps(data, separators=(',', ':')))
 
 
-def full_days(dirs):
-    """{YYYYMMDD: {meter: path}} for every day that has full-day files (no _hasta_) of both meters."""
+def _day_files(dirs):
     files = {}
     for d in dirs:
         if not d or not os.path.isdir(d):
@@ -174,7 +170,65 @@ def full_days(dirs):
             m = PAT.search(os.path.basename(p))
             if m and not m.group(3) and '_discarded' not in p and 'parciales' not in p:
                 files.setdefault(m.group(2), {})[m.group(1).upper()] = p
-    return {k: v for k, v in files.items() if len(v) == 2}
+        for p in glob.glob(os.path.join(d, '**', '*' + PARTIAL_SUFFIX), recursive=True):
+            day = os.path.basename(p)[:8]
+            if day.isdigit():
+                files.setdefault(day, {})['parcial'] = p
+    return files
+
+
+def full_days(dirs):
+    """{YYYYMMDD: {meter: path}} for every day that has full-day files (no _hasta_) of both meters."""
+    return {k: {m: v[m] for m in ('AGRIM02P', 'DAGSR01P')}
+            for k, v in _day_files(dirs).items() if 'AGRIM02P' in v and 'DAGSR01P' in v}
+
+
+def grid_days(dirs):
+    """{YYYYMMDD: {'DAGSR01P': path, 'AGRIM02P': path|None, 'parcial': path|None}} for every day whose
+    grid meter file is complete, whether or not the solar meter's whole day has arrived yet."""
+    return {k: {'DAGSR01P': v['DAGSR01P'], 'AGRIM02P': v.get('AGRIM02P'), 'parcial': v.get('parcial')}
+            for k, v in _day_files(dirs).items() if 'DAGSR01P' in v}
+
+
+def day_solar(entry):
+    """Solar kWh per 15 min for a finished day: the full-day file when it exists, otherwise the part
+    that was published before the solar meter stopped answering (saved when the day ended), else []."""
+    if entry.get('AGRIM02P'):
+        return [round(r[0], 3) for r in parse(entry['AGRIM02P'])][:96]
+    if entry.get('parcial'):
+        try:
+            with open(entry['parcial'], encoding='utf-8') as f:
+                return [round(float(x), 3) for x in json.load(f).get('sol', [])][:96]
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+    return []
+
+
+def save_solar_partial(prev_page, new_date_iso, hist_dirs):
+    """When the page moves on to a new day while the solar data of the day it showed was still short,
+    keep that day's published solar values next to the archive (data/YYYY/YYYYMMDD_solar_parcial.json),
+    so the day's own page can show them until the meter answers and its full-day file replaces them."""
+    try:
+        with open(prev_page, encoding='utf-8') as f:
+            old = json.loads(re.search(r'const D = (\{.*?\});\n', f.read(), re.S).group(1))
+    except (OSError, AttributeError, ValueError):
+        return
+    date = old.get('date', '')
+    if not date or date >= new_date_iso or old.get('archive') or not hist_dirs:
+        return
+    sol = old.get('sol', [])[:old.get('ns', len(old.get('sol', [])))]
+    if len(sol) >= 96:
+        return
+    day = date.replace('-', '')
+    entry = grid_days(hist_dirs).get(day, {})
+    if entry.get('AGRIM02P') or len(day_solar(entry)) >= len(sol):
+        return
+    folder = os.path.join(hist_dirs[0], day[:4])
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, day + PARTIAL_SUFFIX), 'w', encoding='utf-8') as f:
+        json.dump({'date': date, 'sol': sol, 'nota': 'Datos solares publicados hasta que el medidor dejó de responder; '
+                   'se reemplazan solos por el archivo del día completo cuando vuelva la conexión.'}, f, ensure_ascii=False)
+    print(f'{date}: solar meter short ({len(sol)}/96), published values kept in {day + PARTIAL_SUFFIX}')
 
 
 def write_if_changed(path, text):
@@ -194,20 +248,23 @@ def write_if_changed(path, text):
 def build_day_pages(dirs, dest):
     """One page per archived day: <dest>/dias/YYYY-MM-DD.html, plus dias/index.json (list of dates).
     A page is only rewritten when its content changes, so the repository does not churn."""
-    days = full_days(dirs)
+    days = grid_days(dirs)
     out_dir = os.path.join(dest, 'dias')
     os.makedirs(out_dir, exist_ok=True)
     written = 0
+    hhmm = lambda k: '24:00' if k >= 96 else f'{k // 4:02d}:{k % 4 * 15:02d}'
     for day in sorted(days):
-        pair = days[day]
-        ag, ds = parse(pair['AGRIM02P']), parse(pair['DAGSR01P'])
-        n = min(len(ds), len(ag), 96)
+        ds = parse(days[day]['DAGSR01P'])
+        n = min(len(ds), 96)
         if n < 96:
-            continue                                   # only complete days
+            continue                                   # the grid meter's day must be complete
+        sol = day_solar(days[day])
+        ns = min(len(sol), n)
         r3 = lambda x: round(x, 3)
         data = {
-            'date': f'{day[:4]}-{day[4:6]}-{day[6:]}', 'n': n, 'ns': n, 'last': '24:00', 'solLast': '24:00',
-            'built': '', 'sol': [r3(r[0]) for r in ag[:n]], 'inj': [r3(r[0]) for r in ds[:n]],
+            'date': f'{day[:4]}-{day[4:6]}-{day[6:]}', 'n': n, 'ns': ns, 'last': '24:00',
+            'solLast': hhmm(ns) if ns else '',
+            'built': '', 'sol': sol[:ns], 'inj': [r3(r[0]) for r in ds[:n]],
             'grd': [r3(r[1]) for r in ds[:n]], 'snapshot': False, 'archive': True, 'cam': '',
             'hist': history(dirs, day),
         }
@@ -216,7 +273,7 @@ def build_day_pages(dirs, dest):
     dates = [f'{d[:4]}-{d[4:6]}-{d[6:]}' for d in sorted(days)]
     write_if_changed(os.path.join(out_dir, 'index.json'), json.dumps({'dates': dates}, separators=(',', ':')))
     print(f'day pages: {len(dates)} days archived, {written} page(s) written -> {out_dir}')
-    build_month_workbooks(days, parse, dest)
+    build_month_workbooks(full_days(dirs), parse, dest)
 
 
 TEMPLATE = r'''<!doctype html>
@@ -496,7 +553,7 @@ W.use = W.onsite + W.grd;
 // ---- header ----
 const dObj = new Date(D.date+'T12:00:00');
 const dTxt = dObj.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-document.getElementById('sub').innerHTML = dTxt + (D.archive ? ' &middot; <b>día completo</b>' : ' &middot; lecturas hasta las <b>'+D.last+'</b>');
+document.getElementById('sub').innerHTML = dTxt + (D.archive ? (ns < n ? ' &middot; <b>día incompleto</b>: '+(ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares')+' (el medidor de la planta solar no respondió; se completará solo)' : ' &middot; <b>día completo</b>') : ' &middot; lecturas hasta las <b>'+D.last+'</b>');
 if (D.archive){
   document.querySelector('header h1').textContent = 'Planta solar · informe del día';
   document.title = 'Planta Solar · ' + D.date;
@@ -930,7 +987,7 @@ for (let h=0;h<HR.length;h++){
 const tsum = TT;
 t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(tsum.sol)+'</td><td>'+fmt(tsum.onsite)+'</td><td>'+fmt(tsum.grd)+'</td><td>'+fmt(tsum.inj)+'</td><td>'+fmt(tsum.use)+'</td></tr></tfoot>';
 document.getElementById('tbl').innerHTML = t;
-document.getElementById('tblSub').textContent = 'kWh por hora · ' + (D.archive ? 'día completo' : 'hasta las '+D.last);
+document.getElementById('tblSub').textContent = 'kWh por hora · ' + (D.archive ? (ns < n ? 'solar hasta las '+(D.solLast||'00:00') : 'día completo') : 'hasta las '+D.last);
 { const tb = document.getElementById('tblBox');
   tb.addEventListener('toggle', () => { document.getElementById('tblLabel').textContent = tb.open ? 'Tabla por hora (abierta)' : 'Ver tabla por hora'; }); }
 
