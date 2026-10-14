@@ -3,13 +3,15 @@
   "AGRIM02P": {
    "nombre": "Medidor de la planta solar",
    "ultima": "2026-10-14 10:30",
-   "ok": true
+   "ok": false,
+   "intento": "2026-10-14 10:45",
+   "error": "ConnectionResetError: [Errno 104] Connection reset by peer"
   },
   "DAGSR01P": {
    "nombre": "Medidor de entrada (red)",
-   "ultima": "2026-10-14 10:30",
+   "ultima": "2026-10-14 10:45",
    "ok": true
   }
  },
- "actualizado": "2026-10-14 10:30"
+ "actualizado": "2026-10-14 10:45"
 }
