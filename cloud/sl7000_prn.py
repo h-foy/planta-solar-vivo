@@ -429,10 +429,63 @@ def pull_day(name, conn, args, day):
     start = dt.datetime.combine(day, dt.time(0, 0)) - dt.timedelta(minutes=15)
     end = dt.datetime.combine(day, dt.time(0, 0)) + dt.timedelta(days=1, minutes=15)
     cols, rows, period = connect_and_read(name, conn, host, port, start, end, args.timeout)
+    if getattr(args, "gaps", None):
+        rows = fix_gaps(name, day, rows, args.gaps, dt.timedelta(seconds=period or 900))
     lo = dt.datetime.combine(day, dt.time(0, 0))
     hi = lo + dt.timedelta(days=1)
     rows = [(t, v) for (t, v) in rows if lo < t <= hi]
     return cols, rows, period
+
+
+def fix_gaps(name, day, rows, path, step):
+    """Put back the time lost in a power cut.
+
+    The SL7000 stamps only a few rows, so every other row's time is counted forward from the last stamp.
+    When the meter is without power it records nothing and, on this meter, does not stamp the row after
+    the outage either, so everything recorded afterwards would be labelled too early (2026-10-16: a cut from
+    09:00 to 12:45 made the afternoon show up as morning). Rows are always read from the same start
+    (day 00:00 - 15 min), so a row's position in the block is stable for the whole day. This keeps, per
+    meter and day, the last row known to be on time (a read of today that reached the current
+    quarter-hour) and every gap found after it, in the JSON file at `path`:
+        {"AGRIM02P": {"2026-10-16": {"ok_idx": 35, "ok_time": "08:45", "gaps": [[35, 225]]}}}
+    A gap [i, m] means: rows after position i are m minutes later than counted.
+    Reads of today add a gap when the newest row lags the last closed quarter-hour; reads of a finished
+    day (the nightly archive) only apply the gaps found during that day."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            state = json.load(f)
+    except (FileNotFoundError, ValueError):
+        state = {}
+    mine = state.setdefault(name, {})
+    rec = mine.setdefault(day.isoformat(), {})
+    gaps = rec.setdefault("gaps", [])
+    fixed = []
+    for i, (t, v) in enumerate(rows):
+        fixed.append((t + dt.timedelta(minutes=sum(m for j, m in gaps if i > j)), v))
+    if fixed and day == dt.date.today():
+        now = dt.datetime.now()
+        due = now.replace(second=0, microsecond=0) - dt.timedelta(minutes=now.minute % 15)
+        last_i, last_t = len(fixed) - 1, fixed[-1][0]
+        lag = int((due - last_t).total_seconds() // 60)
+        if lag <= int(step.total_seconds() // 60):
+            rec["ok_idx"], rec["ok_time"] = last_i, f"{last_t:%H:%M}"   # on time (or the newest interval still closing)
+        else:
+            after = rec.get("ok_idx")
+            if after is None or after >= last_i:
+                after = last_i - 1                  # nothing known on time today: at least the newest row is right
+            gaps.append([after, lag])
+            log(f"   {name}: {lag} min without records after row {after} (power cut?) - later rows moved forward")
+            fixed = [(t + dt.timedelta(minutes=lag) if i > after else t, v) for i, (t, v) in enumerate(fixed)]
+            rec["ok_idx"], rec["ok_time"] = last_i, f"{fixed[-1][0]:%H:%M}"
+    keep = sorted(mine)[-8:]                        # about a week per meter is plenty
+    state[name] = {k: mine[k] for k in keep}
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=1)
+    except OSError as e:
+        log(f"   gap record not saved: {e}")
+    return fixed
 
 
 # ------------------------------------------------------------------ PRN in / out
@@ -743,6 +796,7 @@ def main():
     ap.add_argument("--full-hours", action="store_true",
                     help="for today: stop at the last complete clock hour (4 of 4 quarter-hours)")
     ap.add_argument("--raw", action="store_true", help="also write a _raw.csv with every profile column + OBIS code")
+    ap.add_argument("--gaps", help="JSON file that records power-cut gaps per meter and day (see fix_gaps)")
     ap.add_argument("--diag", help="folder: write <METER>_diag.txt with each row's stamp and assigned time")
     ap.add_argument("--interface", choices=["hdlc", "wrapper"])
     ap.add_argument("--client", type=int)
