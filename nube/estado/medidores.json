@@ -7,11 +7,9 @@
   },
   "DAGSR01P": {
    "nombre": "Medidor de entrada (red)",
-   "ultima": "2026-10-16 08:45",
-   "ok": false,
-   "intento": "2026-10-16 12:47",
-   "error": "el equipo de comunicación rechazó la conexión (ocupado o sin servicio)"
+   "ultima": "2026-10-16 09:00",
+   "ok": true
   }
  },
- "actualizado": "2026-10-16 12:47"
+ "actualizado": "2026-10-16 12:50"
 }
