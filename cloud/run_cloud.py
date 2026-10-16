@@ -213,7 +213,8 @@ def main():
                 f.write('Los medidores no devolvieron el día completo; se omite del gráfico de 5 días.\n')
             say(f'{day}: incomplete in the meters, noted and skipped from now on')
     if not (due.time() == dt.time(0, 0)):
-        step('read today', ['sl7000_prn.py', '--date', 'today', '--outdir', OUT])
+        step('read today', ['sl7000_prn.py', '--date', 'today', '--outdir', OUT,
+                            '--diag', os.path.join(PAGE_DIR, 'estado', 'diag')])
         update_status(now, LAST_OUTPUT.get('read today', ''))
     if step('build page', ['make_live_page.py', OUT, PAGE_DIR, '--history', DATA], 120):
         say(f'Page state now: {page_state(full=True)}')
