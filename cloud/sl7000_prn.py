@@ -389,8 +389,6 @@ def read_profile(link, conn, start, end):
             cur = cur + step
         times.append(cur)
 
-    global LAST_DIAG
-    LAST_DIAG = [(st, t, [r[m["col"]] for m in value_cols][:2]) for st, t, r in zip(stamps, times, pg.buffer)]
     rows = []
     for r, ts in zip(pg.buffer, times):
         vals = []
@@ -402,9 +400,6 @@ def read_profile(link, conn, start, end):
             vals.append(x)
         rows.append((ts, vals))
     return value_cols, rows, period
-
-
-LAST_DIAG = []
 
 
 def connect_and_read(name, conn, host, port, start, end, timeout):
@@ -797,7 +792,6 @@ def main():
                     help="for today: stop at the last complete clock hour (4 of 4 quarter-hours)")
     ap.add_argument("--raw", action="store_true", help="also write a _raw.csv with every profile column + OBIS code")
     ap.add_argument("--gaps", help="JSON file that records power-cut gaps per meter and day (see fix_gaps)")
-    ap.add_argument("--diag", help="folder: write <METER>_diag.txt with each row's stamp and assigned time")
     ap.add_argument("--interface", choices=["hdlc", "wrapper"])
     ap.add_argument("--client", type=int)
     ap.add_argument("--auth", choices=["none", "low"])
@@ -880,15 +874,6 @@ def main():
                 failures += 1
                 log(f"   FAILED: {type(e).__name__}: {e}")
                 continue
-            if args.diag:
-                try:
-                    os.makedirs(args.diag, exist_ok=True)
-                    with open(os.path.join(args.diag, f"{name}_diag.txt"), "w", encoding="utf-8") as f:
-                        f.write(f"read at {dt.datetime.now():%Y-%m-%d %H:%M:%S}  day {day}  rows {len(LAST_DIAG)}\n")
-                        for i, (st, t, v) in enumerate(LAST_DIAG):
-                            f.write(f"{i:4d}  {t:%m-%d %H:%M}  {st[0] + ' ' + st[1].strftime('%m-%d %H:%M') if st else '-':<20}  {v}\n")
-                except Exception as e:
-                    log(f"   diag not written: {e}")
             if not rows:
                 failures += 1
                 log("   FAILED: the meter returned no intervals for this day (not written)")
