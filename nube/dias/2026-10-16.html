@@ -1,0 +1,1040 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Planta Solar en Vivo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23F39C12'/%3E%3Cg stroke='%23F39C12' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M16 2v4M16 26v4M2 16h4M26 16h4M6 6l3 3M23 23l3 3M6 26l3-3M23 9l3-3'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f3ef; --card:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --ink3:#7a7974;
+  --rule:#e4e2dc; --grid:#ecebe6; --axis:#b9b7b0;
+  --solar:#F39C12; --onsite:#2ECC71; --grid-in:#E74C3C; --inject:#2980B9;
+  --warn-bg:#fff4e0; --warn-ink:#7a4a00;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121211; --card:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --ink3:#8f8e86;
+    --rule:#2c2c2a; --grid:#262624; --axis:#4a4945;
+    --solar:#F5A623; --onsite:#34D17A; --grid-in:#EE5A4C; --inject:#3D93CC;
+    --warn-bg:#3a2a0c; --warn-ink:#ffd58a;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121211; --card:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --ink3:#8f8e86;
+  --rule:#2c2c2a; --grid:#262624; --axis:#4a4945;
+  --solar:#F5A623; --onsite:#34D17A; --grid-in:#EE5A4C; --inject:#3D93CC;
+  --warn-bg:#3a2a0c; --warn-ink:#ffd58a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%}
+body{min-height:100vh}
+main{max-width:760px;margin:0 auto;padding:16px 16px 40px}
+header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
+.sub{color:var(--ink2);font-size:14px}
+.sub b{color:var(--ink);font-weight:600}
+.stale{display:none;margin:12px 0 0;padding:10px 12px;border-radius:10px;background:var(--warn-bg);
+  color:var(--warn-ink);font-size:14px;gap:8px;align-items:flex-start}
+.stale.on{display:flex}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0}
+@media (min-width:560px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:12px}
+.tile .k{font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:6px}
+.tile .v{font-size:22px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:13px;font-weight:500;color:var(--ink2);margin-left:3px}
+.tile .d{font-size:12px;color:var(--ink3);margin-top:2px}
+.sw{width:10px;height:10px;border-radius:3px;flex:none}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:14px 12px 10px;margin:12px 0}
+.card h2{font-size:15px;margin:0 2px 2px}
+.card .note{font-size:12px;color:var(--ink2);margin:0 2px 8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink2);margin:2px 2px 8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend .ln{width:14px;height:3px;border-radius:2px;background:var(--solar)}
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--card);color:var(--ink);border:1px solid var(--rule);
+  border-radius:10px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.14);
+  white-space:nowrap;display:none;z-index:2;font-variant-numeric:tabular-nums}
+.tip b{display:block;margin-bottom:3px}
+.tip div{display:flex;align-items:center;gap:6px}
+.tip div span:last-child{margin-left:auto;padding-left:12px}
+.cam{margin:12px 0}
+.cam .msg2{padding:30px 8px;text-align:center;color:var(--ink2);font-size:13px}
+.cam .row a{color:var(--ink2)}
+.cam button.open{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;text-align:left}
+.cam button.open:hover,.cam a.open:hover{border-color:var(--axis)}
+.cam a.open{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;box-sizing:border-box;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);font-weight:600;text-decoration:none}
+.cam a.open:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
+.cam button.open:focus-visible,.cam button.close:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
+.cam button.open[disabled]{cursor:default;color:var(--ink3);font-weight:500}
+.cam .play{width:26px;height:26px;border-radius:50%;background:var(--grid-in);color:#fff;display:grid;place-items:center;
+  font-size:11px;flex:none}
+.cam button[disabled] .play{background:var(--axis)}
+.cam .sub2{margin-left:auto;font-weight:400;font-size:12px;color:var(--ink2)}
+.cam .box{margin-top:8px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:8px}
+.cam .ratio{position:relative;width:100%;aspect-ratio:16/9;max-width:100%;background:#000;border-radius:8px;overflow:hidden}
+.cam iframe,.cam img{position:absolute;inset:0;width:100%;height:100%;border:0}
+.cam img{object-fit:contain}
+.cam .msg{position:absolute;inset:0;display:grid;place-items:center;color:#ccc;font-size:13px;padding:12px;text-align:center}
+.cam .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--ink2)}
+.cam button.close{border:1px solid var(--rule);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 2px}
+.hd h2{margin:0}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:9px;padding:2px;background:var(--bg)}
+.seg button{border:0;background:transparent;color:var(--ink2);font:inherit;font-size:13px;padding:5px 11px;border-radius:7px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg button:focus-visible{outline:2px solid var(--inject);outline-offset:1px}
+.seg button[disabled]{opacity:.45;cursor:default}
+.days{margin:10px 2px 4px}
+.days table{font-size:12px}
+.days td.today{font-weight:600}
+details{margin:12px 0}
+summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 2px}
+/* hourly table: closed state looks like the camera button */
+details.tblbox>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;
+  border:1px solid var(--rule);background:var(--card);color:var(--ink);font-weight:600;font-size:inherit}
+details.tblbox>summary::-webkit-details-marker{display:none}
+details.tblbox>summary:hover{border-color:var(--axis)}
+details.tblbox>summary:focus-visible{outline:2px solid var(--inject);outline-offset:2px}
+details.tblbox .play{width:26px;height:26px;border-radius:50%;background:var(--inject);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+details.tblbox .sub2{margin-left:auto;font-weight:400;font-size:12px;color:var(--ink2)}
+details.tblbox .box{margin-top:8px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:8px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--rule)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ink);font-weight:700;font-size:12px}
+thead th{border-bottom:2px solid var(--ink)}
+tfoot td{font-weight:650}
+footer{color:var(--ink3);font-size:12px;margin-top:18px;line-height:1.5}
+.daynav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 0}
+.daynav input[type=date]{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--rule);border-radius:9px;
+  background:var(--card);color:var(--ink)}
+.daynav .btn{font:inherit;font-size:13px;padding:6px 11px;border:1px solid var(--rule);border-radius:9px;background:var(--card);
+  color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.daynav .btn:hover{border-color:var(--axis)}
+.daynav .btn[aria-disabled="true"]{opacity:.4;pointer-events:none}
+.daynav .btn:focus-visible,.daynav input:focus-visible{outline:2px solid var(--inject);outline-offset:1px}
+.daynav .lbl{font-size:13px;color:var(--ink2)}
+.daynav .print{margin-left:auto}
+.daynav [hidden]{display:none !important}
+.daynav .msg3{flex-basis:100%;font-size:12px;color:var(--warn-ink)}
+@media print{
+  @page{size:A4 portrait;margin:11mm}
+  html,body{background:#fff !important;font-size:12px}
+  html,body{min-height:0 !important}
+  main{max-width:none;padding:0}
+  .daynav,.seg,#cam,.stale,.tip,details.tblbox>summary{display:none !important}
+  header h1{font-size:17px}
+  .card{border-color:#ccc;padding:6px 8px 2px;margin:6px 0;break-inside:avoid}
+  .card .note{display:none}
+  .tiles{grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:6px;margin:8px 0;break-inside:avoid}
+  .tile{padding:6px 8px;border-color:#ccc}
+  .tile .v{font-size:16px;margin-top:1px}
+  details.tblbox{margin:6px 0}
+  details.tblbox .box{border:0;padding:0;margin:0}
+  table{font-size:10px}
+  th,td{padding:1px 4px}
+  footer{margin-top:4px;font-size:9px}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+/* ---- irrigation pivots ---- */
+:root{--piv:#5B5FC7}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--piv:#8C8FF2}}
+:root[data-theme="dark"]{--piv:#8C8FF2}
+details.tblbox.opbox .play{background:var(--piv)}
+details.tblbox.opbox .box{padding:10px 8px}
+.pivhd{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:space-between;align-items:center;margin:2px 2px 8px 2px;font-size:13px;color:var(--ink2)}
+.pivhd b{color:var(--ink);font-weight:600}
+.pivkey{font-size:11px;color:var(--ink3)}
+.pivkey i{display:inline-block;width:10px;height:8px;border-radius:2px;margin-right:4px;background:var(--piv)}
+.pivbtns{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pbtn{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--rule);background:var(--card);color:var(--ink);cursor:pointer}
+.pbtn:hover{border-color:var(--axis)}
+.pbtn.pri{background:var(--piv);border-color:var(--piv);color:#fff}
+.pbtn[disabled]{opacity:.6;cursor:default}
+.pivhd input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--rule);border-radius:8px;background:var(--card);color:var(--ink);width:150px}
+.pivmsg,.pivsum{font-size:12px;color:var(--ink2);margin:8px 2px 0 2px}
+.pivmsg{color:var(--ink)}
+.pivmsg.ok{color:var(--onsite)}
+.pivmsg.err{color:var(--grid-in)}
+.tip div.th{margin-bottom:2px}
+.tip .pe{font-weight:600;color:var(--ink2);font-size:.95em}
+.tip b{display:inline;margin:0}
+.tip div.th b{display:block;margin-bottom:3px}
+.tip div span.v{margin-left:auto;padding-left:12px;font-variant-numeric:tabular-nums}
+.tip div span.pc{margin-left:0;padding-left:0;width:42px;text-align:right;color:var(--ink3);font-variant-numeric:tabular-nums}
+.tip div.tsub span.nm{padding-left:8px}
+.tip div.dv{border-top:1px dashed var(--ink3);margin:5px 0 4px;height:0}
+@media print{.pivbtns,.pivmsg{display:none !important}}
+.tip div.pk{color:#9A6B00;font-weight:600;font-size:.92em;margin:1px 0 3px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tip div.pk{color:#F0C04A}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Planta solar &middot; energía en vivo</h1>
+    <div class="sub" id="sub"></div>
+    <div class="stale" id="stale" role="status"><span aria-hidden="true">&#9888;</span><span id="staleText"></span></div>
+    <nav class="daynav" id="daynav" aria-label="Elegir día">
+      <a class="btn" id="dPrev" href="#" aria-label="Día anterior">&#9664;</a>
+      <label class="lbl" for="dPick">Ver día</label>
+      <input type="date" id="dPick">
+      <a class="btn" id="dNext" href="#" aria-label="Día siguiente">&#9654;</a>
+      <a class="btn" id="dToday" href="#">Hoy en vivo</a>
+      <button class="btn print" id="dPrint" type="button">&#128438; Imprimir / PDF</button>
+      <a class="btn xls" id="dXls" href="#" download hidden>&#11015; Excel del mes</a>
+      <span class="msg3" id="dMsg" hidden></span>
+    </nav>
+  </header>
+
+  <section class="card">
+    <div class="hd">
+      <h2>SMEC · potencia cada 15 minutos</h2>
+      <div class="seg" role="group" aria-label="Período del gráfico">
+        <button type="button" id="segDay" aria-pressed="true">Hoy</button>
+        <button type="button" id="seg5" aria-pressed="false">5 días</button>
+      </div>
+    </div>
+    <p class="note" id="n15"></p>
+    <div class="legend" id="legend1"></div>
+    <div class="chart" id="c15"></div>
+    <div class="days" id="days5" hidden></div>
+  </section>
+
+  <details class="tblbox opbox" id="opBox">
+    <summary><span class="play" aria-hidden="true">&#9881;</span><span>Detalle operativo pivotes</span><span class="sub2" id="opSub"></span></summary>
+    <div class="box"><div class="piv" id="piv"></div></div>
+  </details>
+
+  <section class="cam" id="cam" hidden aria-label="Cámara de la planta">
+    <button class="open" id="camBtn" type="button" aria-expanded="false" aria-controls="camBox">
+      <span class="play" aria-hidden="true">&#9654;</span>
+      <span id="camLabel">Ver cámara en vivo</span>
+      <span class="sub2" id="camSub">Planta Agritur</span>
+    </button>
+    <div class="box" id="camBox" hidden>
+      <div class="ratio" id="camRatio"></div>
+      <div class="row"><span id="camNote">Video en vivo vía YouTube (sin sonido).</span>
+        <button class="close" id="camClose" type="button">&#10005; Cerrar</button></div>
+    </div>
+  </section>
+
+
+  <section class="tiles" id="tiles" aria-label="Hoy hasta ahora"></section>
+
+
+  <details class="tblbox" id="tblBox">
+    <summary><span class="play" aria-hidden="true">&#9776;</span><span id="tblLabel">Ver tabla por hora</span><span class="sub2" id="tblSub">kWh por hora</span></summary>
+    <div class="box"><table id="tbl"></table></div>
+  </details>
+
+  <footer id="foot"></footer>
+</main>
+
+<script>
+const D = {"date":"2026-10-16","n":96,"ns":96,"last":"24:00","solLast":"24:00","built":"","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.205,1.126,1.37,2.752,3.75,8.858,14.989,15.642,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,8.026,17.92,91.264,82.074,74.022,56.691,60.006,80.243,70.758,53.773,64.922,61.824,37.402,30.413,24.435,21.926,27.942,21.389,19.046,29.107,30.528,23.603,14.682,7.629,7.424,3.622,1.254,0.218,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.051,52.736,41.318,33.587,16.589,19.405,39.834,30.771,13.414,25.088,21.658,1.331,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.205,0.256,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[52.992,36.608,36.096,36.096,36.147,36.096,36.045,36.403,36.045,36.096,36.045,36.096,36.403,35.994,36.25,36.147,36.045,36.045,36.096,36.25,36.301,36.147,36.096,36.25,36.301,36.608,36.966,36.71,35.174,34.765,33.382,32.358,50.33,85.709,70.298,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,32.307,15.155,0.051,0.0,0.0,0.0,0.0,0.0,0.0,0.154,0.0,0.0,4.045,8.96,15.309,18.125,11.059,18.381,20.326,28.416,19.405,15.462,24.166,30.925,31.078,34.867,37.478,38.451,38.81,38.758,38.758,38.554,38.605,38.963,38.81,39.066,38.554,38.554,38.554,38.707,38.963,38.81,38.912,39.578,39.424,39.373],"snapshot":false,"archive":true,"cam":"","hist":[{"date":"2026-10-12","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.013,0.384,1.677,3.674,5.811,8.013,9.203,11.635,9.421,14.298,14.746,24.205,22.49,25.037,16.576,25.536,20.762,16.922,16.166,19.046,19.251,26.867,26.432,33.843,25.19,49.203,83.725,51.546,27.648,59.302,63.77,51.533,72.09,57.664,58.086,48.589,44.352,33.882,72.602,70.323,75.738,73.331,45.082,63.053,48.141,37.555,27.533,14.554,6.387,2.368,0.294,0.013,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,14.182,5.069,0.0,6.349,5.018,4.557,16.538,7.629,6.605,0.102,0.0,0.0,10.138,2.918,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[102.502,101.939,101.837,101.581,101.786,101.734,101.939,101.734,101.632,101.888,101.888,102.144,102.144,102.195,102.042,101.99,102.298,101.939,101.99,101.99,102.144,101.99,102.042,102.298,102.246,104.909,105.677,105.779,105.165,103.27,101.171,99.43,66.662,63.386,60.621,62.822,58.061,57.754,48.384,49.92,47.36,55.962,46.95,51.405,55.296,56.32,53.35,53.094,45.466,46.08,38.349,47.77,23.91,3.942,24.832,44.954,19.558,14.08,25.498,18.33,22.118,21.043,23.398,28.518,39.782,25.6,25.856,30.106,32.666,60.928,43.622,58.726,68.352,77.056,88.627,96.666,100.966,102.963,103.219,103.475,103.322,103.475,103.219,103.117,103.117,103.475,103.27,103.168,103.014,103.168,103.68,103.322,103.68,103.168,103.219,103.526]},{"date":"2026-10-13","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.064,1.28,3.546,3.597,3.622,5.926,6.477,12.262,6.221,14.758,13.632,14.976,11.277,13.632,15.974,23.258,18.752,29.53,44.262,43.174,53.414,65.766,64.96,58.931,45.005,55.526,27.11,17.677,28.582,59.84,72.998,67.046,70.822,38.758,29.299,28.339,55.04,94.246,81.229,84.134,69.453,61.85,52.07,44.646,36.198,27.814,19.315,11.917,4.403,0.998,0.294,0.013,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,22.733,20.685,0.256,0.0,0.0,0.0,0.0,0.0,2.662,3.328,11.52,31.437,0.0,0.0,0.0,2.304,26.726,12.186,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[103.68,103.526,103.322,103.322,103.526,103.987,103.629,103.066,103.066,103.219,103.117,103.066,103.066,103.373,103.219,103.27,103.27,103.014,102.963,103.373,102.963,103.066,103.066,103.168,103.885,103.168,103.424,103.219,101.939,99.789,99.584,110.336,132.454,132.506,95.795,101.734,93.491,94.566,141.619,137.728,129.638,107.469,86.374,91.238,81.05,37.734,32.666,21.965,0.922,4.198,14.131,36.966,51.2,77.926,54.886,44.749,16.896,2.458,5.171,0.154,33.075,43.264,44.544,20.275,4.864,10.957,23.296,38.144,46.182,55.552,62.669,71.168,80.589,89.6,96.358,103.117,85.76,23.142,107.366,108.032,107.776,105.216,105.267,105.779,104.755,104.755,104.909,105.267,105.626,105.728,104.96,104.858,104.909,104.909,105.472,105.165]},{"date":"2026-10-14","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.038,0.947,2.074,8.755,15.066,17.856,21.03,19.494,51.405,31.245,16.269,15.206,20.557,26.675,53.645,90.931,83.405,52.211,70.669,98.982,46.784,102.067,62.49,43.341,67.226,67.405,49.997,55.949,50.624,44.48,69.12,46.848,29.581,22.976,32.922,52.186,105.728,59.661,38.797,32.781,32.538,54.554,43.277,23.885,10.496,11.072,11.315,6.285,5.901,2.778,0.218,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.717,0.614,0.051,0.717,2.867,0.0,3.686,2.253,0.0,0.563,0.154,0.154,0.205,0.358,0.0,1.382,0.205,0.0,0.0,0.0,2.56,32.768,11.008,0.256,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[105.267,105.318,105.216,105.318,105.267,104.96,104.858,104.858,105.011,104.909,105.114,105.011,105.011,105.011,105.267,105.882,105.472,105.165,105.011,105.267,105.421,104.909,105.062,105.062,105.267,105.421,105.318,105.165,104.038,102.861,96.461,91.29,87.706,84.122,90.419,55.398,76.851,91.392,92.467,87.245,81.869,55.091,18.176,26.01,56.013,38.502,12.902,61.133,9.728,48.179,64.41,40.909,41.011,58.368,52.429,58.214,64.154,40.806,61.747,48.486,49.203,39.219,22.989,0.512,24.883,33.894,40.038,71.27,52.326,64.256,82.995,97.638,96.768,95.642,100.71,100.608,103.834,106.138,106.342,106.445,106.598,106.496,106.496,106.445,106.65,106.445,103.987,103.526,103.782,104.141,104.192,104.55,103.987,104.243,104.806,104.397]},{"date":"2026-10-15","sol":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.013,0.41,1.293,4.646,10.714,18.944,27.648,36.403,45.056,53.504,61.466,69.005,76.275,83.021,89.19,95.488,106.803,106.202,57.306,67.981,112.384,102.528,54.694,35.046,115.674,87.322,55.782,36.685,62.349,95.782,116.723,105.818,39.603,25.216,27.29,43.738,39.706,53.978,76.57,47.667,83.917,68.826,62.195,60.173,36.787,16.09,10.035,7.757,9.434,7.027,1.728,0.358,0.026,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"inj":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,3.584,0.563,2.458,6.912,5.786,0.205,0.0,8.346,5.274,7.834,0.358,12.186,30.464,42.803,35.994,6.298,0.0,0.0,4.813,4.045,8.243,17.766,5.888,10.086,0.87,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"grd":[104.397,104.294,103.987,103.68,103.322,103.629,103.629,103.322,103.27,103.322,103.322,103.322,84.326,69.274,69.325,69.581,70.349,70.554,69.427,69.478,69.325,69.427,69.376,69.581,69.888,69.53,69.888,69.734,68.25,65.024,59.341,62.259,98.509,102.758,96.819,84.429,76.493,68.608,61.286,61.542,48.589,42.291,30.822,15.36,48.64,42.24,2.56,11.162,52.736,71.936,0.102,25.498,35.021,37.171,24.166,8.397,0.0,3.379,40.09,48.23,46.182,34.099,37.99,27.238,15.309,31.13,0.41,6.093,11.213,13.312,37.069,57.037,62.976,65.587,63.283,66.099,71.014,72.346,72.755,73.267,72.96,72.755,72.858,73.062,72.909,73.011,73.114,72.704,72.909,72.858,73.267,73.472,73.37,73.37,73.626,74.24]}]};
+const S = [
+  {key:'grd',    name:'Comprada a la red',   css:'--grid-in'},
+  {key:'onsite', name:'Solar consumida en sitio', css:'--onsite'},
+  {key:'inj',    name:'Inyectada a la red',  css:'--inject'},
+  {key:'sol',    name:'Producción solar',    css:'--solar', line:true},
+];
+const col = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (x,d=1) => x==null ? '–' : x.toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const hhmm = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+
+// ---- derive series (null = no reading yet) ----
+const N = 96, n = D.n, ns = (D.ns==null ? n : D.ns);   // ns: intervals that also have solar data
+const q = {sol:[],inj:[],grd:[],onsite:[]};
+for (let i=0;i<N;i++){
+  const g = i<n ? D.grd[i] : null, j = i<n ? D.inj[i] : null, s = i<ns ? D.sol[i] : null;
+  q.grd.push(g); q.inj.push(j); q.sol.push(s); q.onsite.push(s==null ? null : Math.max(0, s-j));
+}
+const H = {sol:[],inj:[],grd:[],onsite:[]};
+const nh = Math.floor(n/4), nhs = Math.floor(ns/4);
+for (let h=0;h<24;h++) for (const k in H){
+  const ok = (k==='sol'||k==='onsite') ? h<nhs : h<nh;
+  H[k].push(ok ? q[k].slice(h*4,h*4+4).reduce((a,b)=>a+b,0) : null);
+}
+const sum = a => a.reduce((t,x)=>t+(x||0),0);
+const T = {sol:sum(q.sol), inj:sum(q.inj), grd:sum(q.grd), onsite:sum(q.onsite)};
+T.use = T.onsite + T.grd;
+// same sums but only over the stretch that has both meters (for honest ratios when solar data is behind)
+const W = {sol:sum(q.sol.slice(0,ns)), inj:sum(q.inj.slice(0,ns)), grd:sum(q.grd.slice(0,ns)), onsite:sum(q.onsite.slice(0,ns))};
+W.use = W.onsite + W.grd;
+
+// ---- header ----
+const dObj = new Date(D.date+'T12:00:00');
+const dTxt = dObj.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+document.getElementById('sub').innerHTML = dTxt + (D.archive ? (ns < n ? ' &middot; <b>día incompleto</b>: '+(ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares')+' (el medidor de la planta solar no respondió; se completará solo)' : ' &middot; <b>día completo</b>') : ' &middot; lecturas hasta las <b>'+D.last+'</b>');
+if (D.archive){
+  document.querySelector('header h1').textContent = 'Planta solar · informe del día';
+  document.title = 'Planta Solar · ' + D.date;
+  document.getElementById('segDay').textContent = 'Día';
+  document.getElementById('cam').hidden = true;
+}
+
+// stale check against Argentina time (UTC-3, no DST)
+(function(){
+  if (D.snapshot || D.archive) return;
+  const nowAR = new Date(Date.now() - 3*3600e3);
+  const todayAR = nowAR.toISOString().slice(0,10);
+  const minsNow = nowAR.getUTCHours()*60 + nowAR.getUTCMinutes();
+  const [lh,lm] = D.last.split(':').map(Number); const minsLast = lh*60+lm;
+  let msg = '';
+  if (D.date < todayAR) {
+    if (minsNow > 7*60+30) msg = 'Se muestra el '+dTxt+'. Todavía no llegaron lecturas de hoy.';
+  } else if (minsNow - minsLast > 50) {
+    msg = 'Sin lecturas nuevas desde las '+D.last+'. Puede haber un problema de conexión con los medidores; la página se pondrá al día sola.';
+  } else if (n - ns >= 2) {
+    msg = 'El medidor de la planta solar no responde'+(D.solLast ? ' desde las '+D.solLast : '')+
+          '. Se muestran los datos de la red al día; la parte solar se completará sola cuando vuelva la conexión.';
+  }
+  if (msg){ document.getElementById('staleText').textContent = msg; document.getElementById('stale').classList.add('on'); }
+  // which meter is failing, and since when (nube/estado/medidores.json, written by every update run even when the page can't be rebuilt)
+  if (msg && D.date >= todayAR) fetch('estado/medidores.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j || !j.medidores) return;
+    const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+    const when = s => !s ? '?' : (s.slice(0,10) === todayAR ? s.slice(11) : s.slice(8,10)+'/'+s.slice(5,7)+' '+s.slice(11));
+    const order = [['DAGSR01P','Medidor de entrada (red)'], ['AGRIM02P','Medidor de la planta solar']];
+    const lines = order.filter(([k]) => j.medidores[k]).map(([k, nm]) => { const m = j.medidores[k];
+      return m.ok ? '&#10003; <b>'+nm+'</b>: funciona &middot; última lectura '+esc(when(m.ultima))
+                  : '&#10007; <b>'+nm+'</b>: sin conexión &middot; última lectura '+esc(when(m.ultima))+(m.intento ? ' &middot; último intento '+esc(when(m.intento)) : '')+(m.error ? ' ('+esc(m.error)+')' : ''); });
+    if (!lines.length) return;
+    const bad = order.filter(([k]) => j.medidores[k] && !j.medidores[k].ok).map(([, nm]) => nm.toLowerCase());
+    const head = bad.length ? 'Sin lecturas nuevas desde las '+D.last+': '+(bad.length === 2 ? 'los dos medidores no responden.' : 'el '+bad[0]+' no responde.')
+                            : 'Sin lecturas nuevas desde las '+D.last+'.';
+    document.getElementById('staleText').innerHTML = esc(head)+'<br>'+lines.join('<br>')+'<br><small>La página se pondrá al día sola cuando vuelva la conexión.</small>';
+  }).catch(() => {});
+})();
+
+// ---- tiles ----
+const pct = (a,b) => b>0 ? Math.round(a/b*100)+'%' : '–';
+const lastKw = ns>0 ? D.sol[ns-1]*4 : 0;
+const peakI = D.sol.reduce((b,v,i,a) => v > a[b] ? i : b, 0), peakKw = (D.sol[peakI]||0)*4;
+const solNote = ns < n ? (ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares todavía') : null;
+const upto = ns < n ? ' (hasta las '+(D.solLast||'00:00')+')' : '';
+// Round the measured totals once, then build the derived ones from those rounded numbers,
+// so what is shown always adds up: consumo = comprada + consumida, producción = consumida + inyectada.
+const rset = X => { const r = {sol:Math.round(X.sol), grd:Math.round(X.grd), inj:Math.round(X.inj)};
+  r.onsite = Math.abs((X.sol - X.inj) - X.onsite) < 0.5 ? r.sol - r.inj : Math.round(X.onsite);   // (clipped intervals: keep the real value)
+  r.use = r.onsite + r.grd; return r; };
+// hourly rows in tenths of kWh (whole numbers, so sums are exact); the tiles use these same totals
+const HR = [], TT = {sol:0, onsite:0, grd:0, inj:0, use:0};
+{ const hsum = (k,h) => { const v = q[k].slice(h*4, h*4+4).filter(x => x!=null); return v.length ? v.reduce((a,b)=>a+b,0) : null; };
+  const t10 = v => v==null ? null : Math.round(v*10);
+  for (let h=0; h<Math.ceil(n/4); h++){
+    const x = {sol:hsum('sol',h), onsite:hsum('onsite',h), grd:hsum('grd',h), inj:hsum('inj',h)};
+    const r = {sol:t10(x.sol), grd:t10(x.grd), inj:t10(x.inj)};
+    r.onsite = x.onsite==null ? null : (Math.abs((x.sol - x.inj) - x.onsite) < 0.05 ? r.sol - r.inj : t10(x.onsite));
+    r.use = r.onsite==null || r.grd==null ? null : r.onsite + r.grd;
+    HR.push(r); for (const k in TT) TT[k] += r[k] || 0;
+  }
+  for (const k in TT) TT[k] /= 10; }
+const RT = rset(TT), RW = ns<n ? rset(W) : RT;
+const tiles = [
+  ['Consumo total del sitio', fmt(ns<n ? RW.use : RT.use,0)+'<small>kWh</small>', ns<n ? 'hasta las '+(D.solLast||'00:00')+' (falta el dato solar)' : 'solar consumida + comprada a la red', null],
+  ['Comprada a la red', fmt(RT.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(RW.grd,RW.use)+upto, '--grid-in'],
+  ['Solar consumida en sitio', fmt(RT.onsite,0)+'<small>kWh</small>', solNote || ('Autoconsumo '+pct(RT.onsite,RT.sol)), '--onsite'],
+  ['Producción solar', fmt(RT.sol,0)+'<small>kWh</small>', solNote || (D.archive ? 'Pico '+fmt(peakKw,0)+' kW a las '+hhmm(peakI*15+15) : 'Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
+  ['Inyectada a la red', fmt(RT.inj,0)+'<small>kWh</small>', pct(RW.inj,RW.sol)+' de la producción solar'+upto, '--inject'],
+  ['Cobertura solar', pct(RW.onsite,RW.use), 'del consumo cubierto por solar'+upto, null],
+];
+document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c]) =>
+  '<div class="tile"><div class="k">'+(c?'<span class="sw" style="background:var('+c+')"></span>':'')+k+
+  '</div><div class="v">'+v+'</div><div class="d">'+d+'</div></div>').join('');
+
+// ---- legends ----
+const legendHTML = S.map(s => s.line
+  ? '<span><span class="ln"></span>'+s.name+'</span>'
+  : '<span><span class="sw" style="background:var('+s.css+')"></span>'+s.name+'</span>').join('');
+document.getElementById('legend1').innerHTML = legendHTML;
+
+// ---- chart ----
+// estimated pivots running in a 15-minute slot, from the site's consumption: about 27 kW with no pivots running,
+// plus about 130 kW per pivot (calibrated on the readings of 1-5 Oct 2026)
+const PIV_BASE_KW = 27, PIV_EACH_KW = 130;
+function pivEstText(d, i, unit){
+  if (unit !== 'kW' || d.grd[i] == null) return '';
+  const use = (d.onsite[i]||0) + (d.grd[i]||0), n = Math.max(0, Math.round((use - PIV_BASE_KW) / PIV_EACH_KW));
+  return n === 0 ? 'sin pivotes operando' : '&asymp; '+n+(n === 1 ? ' pivote operando' : ' pivotes operando');
+}
+let PRINTING = false;
+function niceStep(range, target){
+  const raw = range/target, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const m = raw/p; return (m<=1?1:m<=2?2:m<=2.5?2.5:m<=5?5:10)*p;
+}
+function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
+  opt = opt || {};
+  const box0 = document.getElementById(el);
+  const W = Math.max(300, Math.round(box0.clientWidth || 340));
+  const Hh = PRINTING ? Math.round(W*0.31) : Math.round(Math.min(320, Math.max(210, W*0.58))), pl = 34, pr = 6, pt = 10, pb = 24;
+  const iw = W-pl-pr, ih = Hh-pt-pb;
+  let up = 0, dn = 0;
+  for (let i=0;i<slots;i++){ up = Math.max(up,(d.onsite[i]||0)+(d.grd[i]||0), d.sol[i]||0); dn = Math.max(dn, d.inj[i]||0); }
+  if (up===0) up = 1;
+  const step = niceStep(up+dn, 5);
+  const top = Math.ceil(up/step)*step, bot = dn>0 ? Math.ceil(dn/step)*step : 0;
+  const y = v => pt + (top - v)/(top+bot)*ih;
+  const bw = iw/slots, gap = bw < 3 ? 0 : Math.max(1, Math.min(2, bw*0.18)), w = Math.max(.5, bw-gap);
+  const r = Math.min(4, w/2);
+  const unit = opt.unit || 'kWh';
+  let s = '<svg viewBox="0 0 '+W+' '+Hh+'" role="img" aria-label="'+(unit==='kW' ? 'Gráfico de potencia' : 'Gráfico de energía')+'">';
+  for (let v=-bot; v<=top+1e-9; v+=step){
+    const yy = y(v);
+    s += '<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+yy+'" y2="'+yy+'" stroke="'+(Math.abs(v)<1e-9?col('--axis'):col('--grid'))+'" stroke-width="1"/>';
+    s += '<text x="'+(pl-6)+'" y="'+(yy+4)+'" text-anchor="end" font-size="11" fill="'+col('--ink3')+'">'+fmt(Math.abs(v),0)+'</text>';
+  }
+  if (opt.ticks){
+    for (const [i,txt] of opt.ticks)
+      s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+txt+'</text>';
+    for (const i of (opt.seps||[]))
+      s += '<line x1="'+(pl+i*bw)+'" x2="'+(pl+i*bw)+'" y1="'+pt+'" y2="'+(pt+ih)+'" stroke="'+col('--axis')+'" stroke-width="1" stroke-dasharray="2 3"/>';
+  } else {
+    for (let i=0;i<slots;i+=labelEvery){
+      s += '<text x="'+(pl+i*bw)+'" y="'+(Hh-8)+'" font-size="11" fill="'+col('--ink3')+'" text-anchor="middle">'+labelFn(i)+'</text>';
+    }
+  }
+  // horario pico 18:00-23:00: shaded, hatched band behind the bars (each day in the 5-day view), label on top, strip on the time axis
+  if (unit === 'kW' && slots % 96 === 0){
+    const pk = '#E0A100';
+    s += '<defs><pattern id="'+el+'pk" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="'+pk+'" stroke-width="1.4" stroke-opacity="0.22"/></pattern></defs>';
+    for (let b=0; b<slots; b+=96){
+      const xa = pl + (b+72)*bw, xb = pl + (b+92)*bw, wd = xb - xa;
+      s += '<rect x="'+xa+'" y="'+pt+'" width="'+wd+'" height="'+ih+'" fill="'+pk+'" fill-opacity="0.08"/>';
+      s += '<rect x="'+xa+'" y="'+pt+'" width="'+wd+'" height="'+ih+'" fill="url(#'+el+'pk)"/>';
+      s += '<rect x="'+xa+'" y="'+(pt+ih)+'" width="'+wd+'" height="3" fill="'+pk+'"/>';
+      if (wd > 34) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" font-weight="600" fill="#9A6B00">'+(wd > 110 ? '&#9888; Horario pico 18–23' : wd > 60 ? '&#9888; Pico 18–23' : '&#9888;')+'</text>';
+    }
+  }
+  const y0 = y(0);
+  // shade the stretch that has grid readings but no solar readings (solar meter not answering)
+  { let a0 = -1, a1 = -1;
+    for (let i=0;i<slots;i++){ if (d.sol[i]==null && d.grd[i]!=null){ if (a0<0) a0=i; a1=i; } }
+    if (a0>=0){ const xa = pl+a0*bw, xb = pl+(a1+1)*bw;
+      s += '<rect x="'+xa+'" y="'+pt+'" width="'+(xb-xa)+'" height="'+ih+'" fill="'+col('--ink3')+'" opacity="0.10"/>';
+      if (xb-xa > 60) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" fill="'+col('--ink2')+'">sin datos solares</text>'; } }
+  // rounded-end bar path: rounded at the far end only, anchored to the baseline
+  const bar = (x, y1, y2, c, roundTop) => {
+    const h = Math.abs(y2-y1); if (h < .5) return '';
+    const rr = Math.min(r, h/2);
+    if (roundTop){ const yt = Math.min(y1,y2), yb = Math.max(y1,y2);
+      return '<path fill="'+c+'" d="M'+x+','+yb+'V'+(yt+rr)+'Q'+x+','+yt+' '+(x+rr)+','+yt+'H'+(x+w-rr)+'Q'+(x+w)+','+yt+' '+(x+w)+','+(yt+rr)+'V'+yb+'Z"/>'; }
+    const yt = Math.min(y1,y2), yb = Math.max(y1,y2);
+    return '<path fill="'+c+'" d="M'+x+','+yt+'V'+(yb-rr)+'Q'+x+','+yb+' '+(x+rr)+','+yb+'H'+(x+w-rr)+'Q'+(x+w)+','+yb+' '+(x+w)+','+(yb-rr)+'V'+yt+'Z"/>';
+  };
+  const cOn = col('--onsite'), cG = col('--grid-in'), cI = col('--inject'), cS = col('--solar'), cCard = col('--card');
+  for (let i=0;i<slots;i++){
+    if (d.grd[i]==null && d.sol[i]==null) continue;
+    const x = pl + i*bw + gap/2;
+    const a = d.onsite[i]||0, g = d.grd[i]||0, j = d.inj[i]||0;
+    const yA = y(a), yAG = y(a+g);
+    if (a>0) s += bar(x, y0, yA, cOn, g<=0.0001);
+    if (g>0) s += bar(x, a>0 ? yA-1 : y0, yAG, cG, true);   // 1px surface gap between stacked fills
+    if (j>0) s += bar(x, y0, y(-j), cI, false);
+  }
+  // solar line
+  let p = '', pts = [], segs = [];
+  for (let i=0;i<slots;i++){
+    if (d.sol[i]==null){ if (pts.length) segs.push(pts); pts = []; continue; }
+    pts.push([pl+i*bw+bw/2, y(d.sol[i])]);
+  }
+  if (pts.length) segs.push(pts);
+  pts = segs.length ? segs[segs.length-1] : [];
+  if (pts.length){ p = segs.map(sg => 'M'+sg.map(t=>t[0].toFixed(1)+','+t[1].toFixed(1)).join('L')).join('');
+    s += '<path d="'+p+'" fill="none" stroke="'+cCard+'" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>';
+    s += '<path d="'+p+'" fill="none" stroke="'+cS+'" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>';
+    const lp = pts[pts.length-1];
+    s += '<circle cx="'+lp[0]+'" cy="'+lp[1]+'" r="4.5" fill="'+cS+'" stroke="'+cCard+'" stroke-width="2"/>';
+  }
+  if (opt.extra) s += opt.extra(y, pl, bw);
+  s += '<line id="'+el+'x" x1="0" x2="0" y1="'+pt+'" y2="'+(pt+ih)+'" stroke="'+col('--ink3')+'" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>';
+  s += '<rect x="'+pl+'" y="0" width="'+iw+'" height="'+Hh+'" fill="transparent" id="'+el+'hit"/>';
+  s += '</svg><div class="tip" id="'+el+'tip"></div>';
+  const box = document.getElementById(el); box.innerHTML = s;
+  // hover / tap tooltip
+  const svg = box.querySelector('svg'), tip = document.getElementById(el+'tip'), xl = document.getElementById(el+'x');
+  const show = ev => {
+    const pt0 = ev.touches ? ev.touches[0] : ev; const rc = svg.getBoundingClientRect();
+    const sx = (pt0.clientX - rc.left) / rc.width * W;
+    let i = Math.floor((sx-pl)/bw); i = Math.max(0, Math.min(slots-1, i));
+    if (d.sol[i]==null && d.grd[i]==null){ hide(); return; }
+    const cx = pl + i*bw + bw/2; xl.setAttribute('x1',cx); xl.setAttribute('x2',cx); xl.setAttribute('visibility','visible'); if (opt.onHover) opt.onHover(i);
+    const row = (c,name,v,pc,sub) => '<div'+(sub ? ' class="tsub"' : '')+'><span class="sw" style="background:'+c+'"></span><span class="nm">'+name+'</span><span class="v">'+(v==null ? 'sin datos' : fmt(v)+' '+unit)+'</span><span class="pc">'+(pc==null ? '' : pc+'&nbsp;%')+'</span></div>';
+    // two groups: site use = grid + solar used on site; solar production = used on site + injected (percentages add to 100)
+    const pair = (a, b, t) => (a==null || b==null || !(t > 0)) ? [null, null] : (k => [k, 100-k])(Math.round(a/t*100));
+    const pe = pivEstText(d, i, unit);
+    tip.innerHTML = '<div class="th"><b>'+tipLabel(i)+'</b>'+(pe ? '<span class="pe">'+pe+'</span>' : '')+'</div>'+(unit === 'kW' && slots % 96 === 0 && i % 96 >= 72 && i % 96 < 92 ? '<div class="pk">&#9888; Horario pico (18–23)</div>' : '')+(() => {
+                      const use = d.grd[i]==null ? null : (d.onsite[i]||0)+(d.grd[i]||0), sol = d.sol[i];
+                      const [pG, pO] = pair(d.grd[i], d.onsite[i], use), [pO2, pI] = pair(d.onsite[i], d.inj[i], sol);
+                      let h = row(col('--ink'),'<b>Consumo total del sitio</b>', use) + row(cG,'Comprada a la red',d.grd[i],pG,1) + row(cOn,'Solar consumida en sitio',d.onsite[i],pO,1) +
+                              '<div class="dv"></div>' + row(cS,'<b>Producción solar</b>', sol);
+                      if (sol != null && sol > 0.05) h += row(cOn,'Solar consumida en sitio',d.onsite[i],pO2,1) + row(cI,'Inyectada a la red',d.inj[i],pI,1);
+                      return h; })()+(opt.tipExtra ? opt.tipExtra(i) : '');
+    tip.style.display = 'block';
+    const px = cx/W*rc.width, tw = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(rc.width - tw, px - tw/2)) + 'px';
+    tip.style.top = '-6px'; tip.style.transform = 'translateY(-100%)';
+  };
+  const hide = () => { tip.style.display='none'; xl.setAttribute('visibility','hidden'); if (opt.onHover) opt.onHover(-1); };
+  svg.addEventListener('mousemove', show); svg.addEventListener('mouseleave', hide);
+  svg.addEventListener('touchstart', show, {passive:true}); svg.addEventListener('touchmove', show, {passive:true});
+  document.addEventListener('touchstart', e => { if (!box.contains(e.target)) hide(); }, {passive:true});
+}
+// ---- 5-day view: previous 4 days + today, every 15 minutes, in kW (kWh x 4) ----
+const dname = iso => { const t = new Date(iso+'T12:00:00');
+  return t.toLocaleDateString('es-AR',{weekday:'short'}).replace('.','')+' '+t.getDate(); };
+const F = (function(){
+  const hist = D.hist || [];
+  if (!hist.length) return null;
+  const f = {sol:[],inj:[],grd:[],onsite:[],ticks:[],seps:[],lab:[]};
+  const add = (iso, sol, inj, grd) => {
+    const base = f.sol.length;
+    if (base) f.seps.push(base);
+    f.ticks.push([base+48, dname(iso)]);
+    const k4 = v => v==null ? null : v*4;
+    for (let i=0;i<96;i++){
+      const s0 = k4(sol[i]), j = k4(inj[i]), g = k4(grd[i]);
+      f.sol.push(s0); f.inj.push(j); f.grd.push(g);
+      f.onsite.push(s0==null ? null : Math.max(0, s0-(j||0)));
+      f.lab.push([iso,i]);
+    }
+  };
+  for (const d of hist) add(d.date, d.sol, d.inj, d.grd);
+  add(D.date, q.sol, q.inj, q.grd);
+  f.tip = i => { const [iso,h] = f.lab[i]; const t = new Date(iso+'T12:00:00');
+    return t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'numeric'}).replace('.','')+' · '+hhmm(h*15)+'–'+hhmm(h*15+15); };
+  // per-day totals
+  const tot = a => a.reduce((t,x)=>t+(x||0),0);
+  const rows = hist.map(d => [d.date, tot(d.sol), tot(d.grd), tot(d.inj), false]);
+  rows.push([D.date, T.sol, T.grd, T.inj, true]);
+  let tb = '<table><thead><tr><th>Día</th><th>Solar</th><th>Comprada a la red</th><th>Inyectada</th></tr></thead><tbody>';
+  for (const [iso,a,b,c,today] of rows)
+    tb += '<tr><td'+(today?' class="today"':'')+'>'+dname(iso)+(today && !D.archive ?' (hasta '+D.last+')':'')+'</td><td>'+fmt(a,0)+'</td><td>'+fmt(b,0)+'</td><td>'+fmt(c,0)+'</td></tr>';
+  document.getElementById('days5').innerHTML = tb + '</tbody></table>';
+  return f;
+})();
+let mode5 = false;
+try { mode5 = localStorage.getItem('vista60') === '5d'; } catch(e) {}
+function setMode(five){
+  mode5 = !!(five && F);
+  document.getElementById('segDay').setAttribute('aria-pressed', String(!mode5));
+  document.getElementById('seg5').setAttribute('aria-pressed', String(mode5));
+  document.getElementById('n15').innerHTML = mode5
+    ? 'Últimos 5 días: los 4 días anteriores y hoy hasta la última lectura, en kW promedio de cada 15 minutos. Totales por día (kWh) debajo del gráfico.'
+    : 'kW promedio de cada intervalo de 15 minutos (kWh del medidor &times; 4). Barras sobre la línea: lo que consumió el sitio. Debajo de la línea: solar inyectada a la red.';
+  document.getElementById('days5').hidden = !mode5;
+  try { localStorage.setItem('vista60', mode5 ? '5d' : 'hoy'); } catch(e) {}
+}
+if (!F){ const b = document.getElementById('seg5'); b.disabled = true; b.title = 'Todavía no hay días anteriores guardados'; }
+document.getElementById('segDay').addEventListener('click', () => { setMode(false); draw(); });
+document.getElementById('seg5').addEventListener('click', () => { setMode(true); draw(); });
+setMode(mode5);
+
+// 15-minute chart in kW: average power of each interval = kWh x 4
+const q4 = {}; for (const k in q) q4[k] = q[k].map(v => v==null ? null : v*4);
+function draw(){
+  const pivOn = typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open;
+  if (mode5 && F) chart('c15', F, F.sol.length, 0, null, F.tip,
+    Object.assign({ticks:F.ticks, seps:F.seps, unit:'kW'}, pivOn ? {onHover: i => pivHover(i, -1, true)} : {}));
+  else chart('c15', q4, 96, (document.getElementById('c15').clientWidth||340) < 480 ? 16 : 12, i => hhmm(i*15), i => hhmm(i*15)+'–'+hhmm(i*15+15),
+    Object.assign({unit:'kW'}, typeof PIV !== 'undefined' && PIV.loaded && document.getElementById('opBox').open ? {onHover: i => pivHover(i, -1, true)} : {}));
+  if (typeof renderOp === 'function') renderOp();
+}
+draw();
+
+// ---- live camera (loads only when opened) ----
+(function(){
+  const btn = document.getElementById('camBtn'), box = document.getElementById('camBox'),
+        ratio = document.getElementById('camRatio');
+  if (!D.cam) {
+    btn.disabled = true;
+    document.getElementById('camLabel').textContent = 'Cámara en vivo: próximamente';
+    return;
+  }
+  // 'dmss' in camara.txt: live video is watched in Dahua's DMSS app with the view-only login, so the button
+  // opens a short how-to with the app links instead of showing anything on the page
+  if (D.cam.toLowerCase() === 'dmss') {
+    ratio.hidden = true;
+    document.getElementById('camSub').textContent = 'Planta Agritur · app DMSS';
+    document.getElementById('camNote').innerHTML =
+      'El video en vivo se ve en la app <b>DMSS</b> de Dahua (gratis), con el usuario de solo lectura de la cámara. ' +
+      'Abrí DMSS y elegí la cámara <b>Agritur</b>. ¿No tenés la app? ' +
+      '<a href="https://apps.apple.com/app/dmss/id1493268178" target="_blank" rel="noopener">iPhone</a> · ' +
+      '<a href="https://play.google.com/store/apps/details?id=com.mm.android.DMSS" target="_blank" rel="noopener">Android</a>';
+    btn.addEventListener('click', () => { box.hidden = !box.hidden; btn.setAttribute('aria-expanded', String(!box.hidden)); });
+    document.getElementById('camClose').addEventListener('click', () => { box.hidden = true; btn.setAttribute('aria-expanded','false'); btn.focus(); });
+    return;
+  }
+  const photo = /\.(jpe?g|png)(\?.*)?$/i.test(D.cam);
+  const idle = photo ? 'Ver foto de la cámara' : 'Ver cámara en vivo';
+  document.getElementById('camLabel').textContent = idle;
+  if (photo) {
+    document.getElementById('camSub').textContent = 'Planta Agritur · cada 15 min';
+    document.getElementById('camNote').textContent = 'Última foto de la cámara (se actualiza cada 15 minutos).';
+  }
+  let timer = null;
+  // our own Worker also says when the photo was taken: show it, and flag a photo over 40 minutes old
+  const photoTime = async () => {
+    let base; try { base = new URL(D.cam); } catch (e) { return; }
+    if (!base.hostname.endsWith('.workers.dev')) return;
+    try {
+      const r = await fetch(base.origin + '/foto', { cache: 'no-store' });
+      const j = r.ok ? await r.json() : {};
+      if (!j.hora) return;
+      const t = new Date(j.hora);
+      const hhmm = t.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires',
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const old = (Date.now() - t.getTime()) > 40 * 60000;
+      const note = document.getElementById('camNote');
+      note.textContent = 'Foto del ' + hhmm + (old ? ' — la cámara no envía fotos nuevas hace un rato.' : ' (se actualiza cada 15 minutos).');
+      note.style.color = old ? '#b45309' : '';
+    } catch (e) {}
+  };
+  const loadPhoto = () => {
+    const sep = D.cam.includes('?') ? '&' : '?';
+    const img = new Image();
+    img.alt = 'Última foto de la cámara de la planta';
+    img.onload = () => { ratio.innerHTML = ''; ratio.appendChild(img); photoTime(); };
+    img.onerror = () => { if (!ratio.querySelector('img'))
+      ratio.innerHTML = '<div class="msg">La foto todavía no está disponible. Probá de nuevo en unos minutos.</div>'; };
+    img.src = D.cam + sep + 't=' + Date.now();     // skip any cached copy
+  };
+  const open = () => {
+    if (photo) {
+      ratio.innerHTML = '<div class="msg">Cargando foto…</div>';
+      loadPhoto(); timer = setInterval(loadPhoto, 60000);
+    } else {
+      const sep = D.cam.includes('?') ? '&' : '?';
+      ratio.innerHTML = '<iframe src="' + D.cam + sep + 'autoplay=1&mute=1&playsinline=1&rel=0" title="Cámara de la planta en vivo" ' +
+        'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    }
+    box.hidden = false; btn.setAttribute('aria-expanded','true');
+    document.getElementById('camLabel').textContent = photo ? 'Foto de la cámara (abierta)' : 'Cámara en vivo (abierta)';
+  };
+  const close = () => {
+    clearInterval(timer); timer = null;
+    ratio.innerHTML = '';                       // stops the video and its data use
+    box.hidden = true; btn.setAttribute('aria-expanded','false');
+    document.getElementById('camLabel').textContent = idle;
+  };
+  btn.addEventListener('click', () => box.hidden ? open() : close());
+  document.getElementById('camClose').addEventListener('click', () => { close(); btn.focus(); });
+})();
+
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
+
+// ---- day navigation (archived days live in dias/YYYY-MM-DD.html) ----
+(function(){
+  const home = D.archive ? '../' : './', dayUrl = iso => (D.archive ? '' : 'dias/') + iso + '.html';
+  const todayAR = new Date(Date.now() - 3*3600e3).toISOString().slice(0,10);
+  const pick = document.getElementById('dPick'), prev = document.getElementById('dPrev'), next = document.getElementById('dNext'),
+        msg = document.getElementById('dMsg'), toToday = document.getElementById('dToday');
+  pick.value = D.date; pick.max = todayAR;
+  toToday.href = home;
+  if (!D.archive) toToday.hidden = true;
+  const off = a => { a.setAttribute('aria-disabled','true'); a.removeAttribute('href'); };
+  off(prev); off(next);
+  let dates = [];
+  const go = iso => {
+    msg.hidden = true;
+    if (iso === todayAR) { location.href = home; return; }
+    if (dates.includes(iso)) { location.href = dayUrl(iso); return; }
+    msg.textContent = 'No hay datos guardados del ' + iso.split('-').reverse().join('/') +
+      (dates.length ? '. Hay días desde el ' + dates[0].split('-').reverse().join('/') + '.' : '.');
+    msg.hidden = false; pick.value = D.date;
+  };
+  pick.addEventListener('change', () => { if (pick.value) go(pick.value); });
+  fetch((D.archive ? '' : 'dias/') + 'index.json?t=' + Date.now(), {cache:'no-store'})
+    .then(r => r.ok ? r.json() : {dates:[]}).then(j => {
+      dates = (j.dates || []).filter(x => x !== todayAR);
+      if (dates.length) pick.min = dates[0];
+      const before = dates.filter(x => x < D.date), after = dates.filter(x => x > D.date);
+      if (before.length) { prev.href = dayUrl(before[before.length-1]); prev.removeAttribute('aria-disabled'); }
+      if (after.length) { next.href = dayUrl(after[0]); next.removeAttribute('aria-disabled'); }
+      else if (D.archive) { next.href = home; next.removeAttribute('aria-disabled'); }
+    }).catch(() => {});
+  // print / save as PDF: light colours, single-day chart, hourly table open
+  let saved = null;
+  const before = () => {
+    if (saved) return;
+    const tb = document.getElementById('tblBox');
+    saved = {mode5, open: tb.open, theme: document.documentElement.getAttribute('data-theme')};
+    PRINTING = true; document.documentElement.setAttribute('data-theme','light');
+    mode5 = false; document.getElementById('days5').hidden = true; tb.open = true; draw();
+  };
+  const after = () => {
+    if (!saved) return;
+    PRINTING = false;
+    if (saved.theme == null) document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', saved.theme);
+    document.getElementById('tblBox').open = saved.open; setMode(saved.mode5); draw(); saved = null;
+  };
+  addEventListener('beforeprint', before); addEventListener('afterprint', after);
+  document.getElementById('dPrint').addEventListener('click', () => { before(); setTimeout(() => window.print(), 50); });
+  // monthly Excel (excel/YYYY-MM.xlsx: daily summary + every 15-minute reading of the complete days)
+  { const xls = document.getElementById('dXls'), xdir = (D.archive ? '../' : '') + 'excel/';
+    const mes = iso => new Date(iso+'T12:00:00').toLocaleDateString('es-AR',{month:'short',year:'numeric'}).replace('.','');
+    fetch(xdir + 'index.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.json() : {}).then(j => {
+      const meses = j.meses || {}; let ym = D.date.slice(0,7);
+      if (!meses[ym]) {                       // e.g. the 1st of the month: no complete day yet, offer last month
+        const prior = Object.keys(meses).filter(k => k < ym).sort(); if (!prior.length) return; ym = prior[prior.length-1]; }
+      const m = meses[ym];
+      xls.href = xdir + ym + '.xlsx?v=' + m.hasta;
+      xls.setAttribute('download', 'Planta solar ' + ym + '.xlsx');
+      xls.innerHTML = '&#11015; Excel ' + mes(ym + '-15');
+      xls.title = 'Resumen diario y lecturas cada 15 minutos de ' + mes(ym + '-15') + ' (' + m.dias + ' días completos, hasta el ' +
+        m.hasta.split('-').reverse().join('/') + ')';
+      xls.hidden = false;
+    }).catch(() => {}); }
+})();
+
+// ---- hourly table ----
+let t = '<thead><tr><th>Hora</th><th>Solar</th><th>Consumida en sitio</th><th>Desde la red</th><th>A la red</th><th>Consumo total</th></tr></thead><tbody>';
+// every hour with readings (HR, built above), including the hour still in progress
+for (let h=0;h<HR.length;h++){
+  const r = {}; for (const k in HR[h]) r[k] = HR[h][k]==null ? null : HR[h][k]/10;
+  const partial = (h+1)*4 > n;
+  t += '<tr><td>'+hhmm(h*60)+(partial ? ' <small>(hasta '+D.last+')</small>' : '')+'</td><td>'+fmt(r.sol)+'</td><td>'+fmt(r.onsite)+'</td><td>'+fmt(r.grd)+'</td><td>'+fmt(r.inj)+'</td><td>'+fmt(r.use)+'</td></tr>';
+}
+const tsum = TT;
+t += '</tbody><tfoot><tr><td>Total</td><td>'+fmt(tsum.sol)+'</td><td>'+fmt(tsum.onsite)+'</td><td>'+fmt(tsum.grd)+'</td><td>'+fmt(tsum.inj)+'</td><td>'+fmt(tsum.use)+'</td></tr></tfoot>';
+document.getElementById('tbl').innerHTML = t;
+document.getElementById('tblSub').textContent = 'kWh por hora · ' + (D.archive ? (ns < n ? 'solar hasta las '+(D.solLast||'00:00') : 'día completo') : 'hasta las '+D.last);
+{ const tb = document.getElementById('tblBox');
+  tb.addEventListener('toggle', () => { document.getElementById('tblLabel').textContent = tb.open ? 'Tabla por hora (abierta)' : 'Ver tabla por hora'; }); }
+
+document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
+  'Página generada el '+D.built+' (hora de Argentina); se actualiza sola cada 5 minutos.';
+
+if (D.archive) document.getElementById('foot').innerHTML = 'Informe del '+dTxt+'. Energía en kWh y potencia en kW (promedio de cada 15 minutos), '+
+  'leídas de los medidores SMEC de la planta (AGRIM02P solar, DAGSR01P conexión a la red).';
+if (D.snapshot) document.getElementById('foot').innerHTML = 'Energía en kWh y potencia en kW (promedio de cada 15 minutos), leídas de los medidores de la planta. '+
+  '<b>Vista de prueba</b> con datos hasta las '+D.last+'. La versión definitiva se actualizará sola cada 15 minutos.';
+// refresh: reload every 5 minutes, bypassing stale copies
+// reload every 5 minutes for fresh readings, but never while someone is editing the pivot times
+function reloadLater(){ setTimeout(() => { if (window.PIV_BUSY && window.PIV_BUSY()) return reloadLater();
+  location.replace(location.pathname + '?t=' + Date.now()); }, 5*60*1000); }
+if (!D.snapshot && !D.archive) reloadLater();
+</script>
+<script>
+// ---- irrigation pivots: "Detalle operativo pivotes" ----
+// Times are stored per day in pivotes/YYYY-MM-DD.json at the site root ({"date":..,"on":["0101..." x N]}, one 96-char
+// string per pivot, '1' = on in that 15-minute slot). pivotes/config.json holds {"n":10,"kw":140,"api":"https://..."};
+// "api" is the small helper service that checks the edit password and saves the file (the GitHub key never reaches the page).
+const PIV = {n:10, kw:140, api:'', on:null, saved:'[]', carry:[], loaded:false, edit:false, pend:null, pw:'', msg:'', cls:'', busy:false};
+const PIV_ROOT = D.archive ? '../../' : '../';
+const pivBlank = () => Array.from({length:PIV.n}, () => new Array(96).fill(false));
+function pivFrom(list){ const a = pivBlank();
+  (list || []).forEach((s,p) => { if (p < PIV.n && typeof s === 'string') for (let i=0;i<96;i++) a[p][i] = s[i] === '1'; }); return a; }
+const pivTo = a => a.map(r => r.map(v => v ? '1' : '0').join(''));
+function pivSs(k, v){ try { if (v === undefined) return sessionStorage.getItem(k) || ''; if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch(e) {} return ''; }
+const pivDirty = () => !!PIV.on && JSON.stringify(pivTo(PIV.on)) !== PIV.saved;
+window.PIV_BUSY = () => PIV.edit || pivDirty();
+function pivN(i){ let n = 0; if (PIV.on) for (const r of PIV.on) if (r[i]) n++; return n; }
+function pivUse(i){ if (q.grd[i]==null) return null; const s = q.sol[i], j = q.inj[i]||0;
+  return ((s==null ? 0 : Math.max(0, s-j)) + (q.grd[i]||0)) * 4; }
+function pivLine(y, pl, bw){
+  let d = '';
+  for (let i=0;i<96;i++){ const yy = Math.max(2, y(pivN(i)*PIV.kw)).toFixed(1);
+    d += (i ? 'L' : 'M') + (pl+i*bw).toFixed(1) + ',' + yy + 'L' + (pl+(i+1)*bw).toFixed(1) + ',' + yy; }
+  return '<path d="'+d+'" fill="none" stroke="'+col('--card')+'" stroke-width="5" stroke-linejoin="round"/>' +
+         '<path d="'+d+'" fill="none" stroke="'+col('--piv')+'" stroke-width="2.25" stroke-linejoin="round"/>';
+}
+function pivTip(i){ const on = []; if (PIV.on) PIV.on.forEach((r,p) => { if (r[i]) on.push('P'+(p+1)); });
+  return '<div><span class="sw" style="background:'+col('--onsite')+'"></span><span>Pivotes encendidos</span><span>'+(on.length ? on.join(', ') : 'ninguno')+'</span></div>'; }
+const pivCanEdit = () => PIV.edit && !!PIV.pw;
+function renderPiv(){
+  const el = document.getElementById('piv'), n = 96, K = PIV.kw;
+  // same geometry as chart('c15') above, shifted by the horizontal offset between the two boxes, so each cell sits under its bar
+  const c15 = document.getElementById('c15');
+  const W = Math.max(300, Math.round(c15.clientWidth || 340));
+  const off = c15.getBoundingClientRect().left - el.getBoundingClientRect().left, SW = Math.max(W, Math.round(el.clientWidth || W));
+  const pl = off + 34, pr = 6, iw = W-34-pr, bw = iw/n, gap = bw < 3 ? 0 : Math.max(1, Math.min(2, bw*0.18)), w = Math.max(.5, bw-gap);
+  const rr = Math.min(2, w/2), rh = pivCanEdit() ? 22 : 12, sp = 4, H = PIV.n*(rh+sp);
+  const cOn = col('--onsite'), cStop = col('--grid-in'), cOff = col('--grid'), cT = col('--ink3');
+  const nowSlot = D.archive ? 96 : Math.max(0, D.n || 0);   // live page: slots after the last reading are still to come
+  const TOP = 22, BOT = 18;
+  PIV.g = {pl, bw, SW, H, TOP, BOT, rh, sp, cbw: (W-34-pr)/n, n, on: p => PIV.on[p], lab: i => hhmm(i*15)+'–'+hhmm(i*15+15)};
+  let s = '<svg class="pivsvg" viewBox="0 '+(-TOP)+' '+SW+' '+(H+TOP+BOT)+'" width="100%" style="display:block;touch-action:pan-y" role="img" aria-label="Horarios de los pivotes">';
+  // horario pico 18:00-23:00, same band as on the chart: hatched background, label on top, strip under the rows
+  { const xa = pl + 72*bw, wd = 20*bw, pk = '#E0A100';
+    s += '<defs><pattern id="pivpk" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="'+pk+'" stroke-width="1.4" stroke-opacity="0.22"/></pattern></defs>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="-16" width="'+wd.toFixed(2)+'" height="'+(H-sp+16)+'" fill="'+pk+'" fill-opacity="0.08"/>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="-16" width="'+wd.toFixed(2)+'" height="'+(H-sp+16)+'" fill="url(#pivpk)"/>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="'+(H-sp+1)+'" width="'+wd.toFixed(2)+'" height="3" fill="'+pk+'"/>';
+    if (wd > 34) s += '<text x="'+(xa+wd/2).toFixed(1)+'" y="-5" text-anchor="middle" font-size="10.5" font-weight="600" fill="#9A6B00">'+(wd > 110 ? '&#9888; Horario pico 18–23' : wd > 60 ? '&#9888; Pico 18–23' : '&#9888;')+'</text>';
+  }
+  for (let p=0;p<PIV.n;p++){
+    const y0 = p*(rh+sp);
+    s += '<text x="'+(pl-6)+'" y="'+(y0+rh/2+3.5)+'" text-anchor="end" font-size="10.5" fill="'+cT+'">P'+(p+1)+'</text>';
+    const r = PIV.on[p];
+    for (let i=0;i<n;i++){
+      const on = r[i], start = on && (i === 0 || !r[i-1]), stop = !on && i > 0 && r[i-1];
+      const c = on ? cOn : stop ? cStop : cOff;
+      const extra = (start ? ' stroke="'+col('--ink')+'" stroke-width="1"' : '') + (on && i >= nowSlot ? ' fill-opacity="0.4"' : '');
+      const what = start ? ' · encendido' : stop ? ' · apagado' : on ? ' · funcionando' : '';
+      s += '<rect data-p="'+p+'" data-i="'+i+'" x="'+(pl+i*bw+gap/2).toFixed(2)+'" y="'+y0+'" width="'+w.toFixed(2)+'" height="'+rh+'" rx="'+rr+'" fill="'+c+'"'+extra+'><title>Pivote '+(p+1)+' · '+hhmm(i*15)+'–'+hhmm(i*15+15)+what+'</title></rect>';
+    }
+    if (pivCanEdit()) for (let i=0;i<n;i++)   // full-width tap target per slot, so taps between thin bars still land on a slot
+      s += '<rect data-p="'+p+'" data-i="'+i+'" x="'+(pl+i*bw).toFixed(2)+'" y="'+y0+'" width="'+bw.toFixed(2)+'" height="'+rh+'" fill="transparent" style="cursor:pointer"/>';
+  }
+  const every = W < 480 ? 16 : 12;   // same hour labels as the chart above
+  for (let i=0;i<n;i+=every) s += '<text x="'+(pl+i*bw).toFixed(1)+'" y="'+(H+12)+'" font-size="10.5" fill="'+cT+'" text-anchor="middle">'+hhmm(i*15)+'</text>';
+  s += '<line id="pivX" x1="0" x2="0" y1="-4" y2="'+(H-sp)+'" stroke="'+cT+'" stroke-width="1" stroke-dasharray="3 3" visibility="hidden" pointer-events="none"/>';
+  s += '<g id="pivT" visibility="hidden" pointer-events="none"><rect x="0" y="'+(-TOP+1)+'" height="17" rx="5" fill="'+col('--ink')+'"/>' +
+       '<text x="0" y="'+(-TOP+13.5)+'" font-size="11.5" font-weight="600" fill="'+col('--card')+'" text-anchor="middle"></text></g>';
+  s += '</svg>';
+  let btns;
+  if (!PIV.edit) btns = '<button type="button" class="pbtn" data-a="edit">Editar horarios</button>';
+  else if (!PIV.pw) btns = '<input type="password" id="pivPw" placeholder="Contraseña" autocomplete="current-password">' +
+       '<button type="button" class="pbtn pri" data-a="login"'+(PIV.busy?' disabled':'')+'>Entrar</button><button type="button" class="pbtn" data-a="cancel">Cancelar</button>';
+  else btns = '<button type="button" class="pbtn pri" data-a="save"'+(PIV.busy?' disabled':'')+'>'+(PIV.busy ? 'Guardando…' : 'Guardar')+'</button><button type="button" class="pbtn" data-a="cancel">Cancelar</button>';
+  let h = '<div class="pivhd"><span><b>Pivotes de riego</b> <span class="pivkey"><i style="background:var(--onsite)"></i>encendido <i style="background:var(--grid-in);margin-left:8px"></i>apagado</span></span><span class="pivbtns">'+btns+'</span></div>' + s;
+  let msg = PIV.msg, cls = PIV.cls;
+  if (!msg && pivCanEdit()) msg = 'Toque el cuarto de hora en que se <b>encendió</b> un pivote (queda <b style="color:var(--onsite)">verde</b> hasta que se apague) y después el cuarto de hora en que se <b>apagó</b> (<b style="color:var(--grid-in)">rojo</b>). Tocar un bloque de inicio o uno rojo lo borra. Al terminar, <b>Guardar</b>.';
+  if (msg) h += '<p class="pivmsg'+(cls ? ' '+cls : '')+'">'+msg+'</p>';
+  let tot = 0, used = 0; const per = [];
+  for (let i=0;i<n;i++){ const u = pivUse(i); if (u!=null) used += u/4; }
+  for (let p=0;p<PIV.n;p++){ const r = PIV.on[p], c = r.filter(Boolean).length; if (!c) continue; tot += c;
+    const runs = []; for (let i=0;i<n;i++) if (r[i] && (i === 0 || !r[i-1])){ let j = i; while (j < n && r[j]) j++; runs.push(hhmm(i*15)+'→'+(j < n ? hhmm(j*15) : (D.archive ? '24:00' : 'sigue'))); }
+    per.push('<b>P'+(p+1)+'</b> '+runs.join(', ')); }
+  if (PIV.carry && PIV.carry.length && !pivDirty()) h += '<p class="pivsum">Siguen encendidos desde el día anterior (nadie marcó que se apagaron): <b>'+PIV.carry.map(p => 'P'+(p+1)).join(', ')+'</b>.</p>';
+  h += '<p class="pivsum">' + (tot
+      ? per.join(' &middot; ')
+      : 'Todavía no hay horarios de pivotes para este día.') + '</p>';
+  el.innerHTML = h;
+  const svg = el.querySelector('.pivsvg');
+  const move = ev => { const t = ev.touches ? ev.touches[0] : ev, r = svg.getBoundingClientRect(), g = PIV.g;
+    const x = (t.clientX - r.left) * g.SW / r.width, y = (t.clientY - r.top) * (g.H + g.TOP + g.BOT) / r.height - g.TOP;
+    const i = Math.floor((x - g.pl) / g.bw), p = Math.floor(y / (g.rh + g.sp));
+    pivHover(i >= 0 && i < g.n ? i : -1, p >= 0 && p < PIV.n ? p : -1, false); };
+  svg.addEventListener('mousemove', move); svg.addEventListener('mouseleave', () => pivHover(-1, -1, false));
+  svg.addEventListener('touchstart', move, {passive:true}); svg.addEventListener('touchmove', move, {passive:true});
+  const pw = document.getElementById('pivPw');
+  if (pw){ pw.focus(); pw.addEventListener('keydown', e => { if (e.key === 'Enter') pivAction('login'); }); }
+}
+// time guide: dashed line + time label over the pivot rows, mirrored on the main chart's dashed line
+function pivHover(i, p, fromChart){
+  const ln = document.getElementById('pivX'), lab = document.getElementById('pivT'), g = PIV.g;
+  if (!ln || !g) return;
+  const xl = document.getElementById('c15x');
+  if (i < 0){ ln.setAttribute('visibility','hidden'); lab.setAttribute('visibility','hidden');
+    if (!fromChart && xl) xl.setAttribute('visibility','hidden'); return; }
+  const cx = g.pl + i*g.bw + g.bw/2;
+  ln.setAttribute('x1', cx); ln.setAttribute('x2', cx); ln.setAttribute('visibility','visible');
+  let txt = g.lab(i);
+  if (p >= 0){ const r = g.on(p), st = r[i] && (i === 0 || !r[i-1]), sp2 = !r[i] && i > 0 && r[i-1];
+    txt = 'P'+(p+1)+'  ·  '+txt + (st ? '  ·  encendido' : sp2 ? '  ·  apagado' : r[i] ? '  ·  funcionando' : ''); }
+  const t = lab.querySelector('text'), rc = lab.querySelector('rect');
+  t.textContent = txt;
+  const tw = (t.getComputedTextLength ? t.getComputedTextLength() : txt.length*6.5) + 14;
+  const lx = Math.max(tw/2 + 2, Math.min(g.SW - tw/2 - 2, cx));
+  t.setAttribute('x', lx); rc.setAttribute('x', lx - tw/2); rc.setAttribute('width', tw);
+  lab.setAttribute('visibility','visible');
+  if (!fromChart && xl){ const c = 34 + i*g.cbw + g.cbw/2; xl.setAttribute('x1', c); xl.setAttribute('x2', c); xl.setAttribute('visibility','visible'); }
+}
+function renderOp(){
+  const box = document.getElementById('opBox'); if (!box || !PIV.loaded) return;
+  // live page: pivots running in the current quarter-hour; past days: pivots that ran at some point that day
+  const cur = Math.min(95, Math.max(0, D.n || 0));
+  let cnt = 0; for (const r of PIV.on) if (D.archive ? r.some(Boolean) : r[cur]) cnt++;
+  document.getElementById('opSub').textContent = D.archive
+    ? (cnt ? cnt+(cnt === 1 ? ' pivote funcionó' : ' pivotes funcionaron') : '')
+    : (cnt ? cnt+' en marcha ahora' : 'ninguno en marcha');
+  if (!box.open) return;
+  if (mode5 && F){ renderPiv5(); return; }
+  renderPiv();
+}
+// ---- 5-day view: one row per pivot across the same 5 days as the chart (read-only; times are edited in the Día view) ----
+// Earlier days come from their saved files; a day with nothing saved inherits the pivots still running at the end of the
+// day before (same rule as the Día view). Today uses the times currently loaded above.
+const PIV5 = {days:null, loading:false};
+const pivHas = j => !!(j && Array.isArray(j.on) && j.on.length);
+async function piv5Load(){
+  if (PIV5.days || PIV5.loading || !F) return;
+  PIV5.loading = true;
+  const dates = (D.hist || []).map(h => h.date);
+  const got = await Promise.all(dates.map(d => pivFetch(d)));
+  let prev = null;
+  if (dates.length && !pivHas(got[0])){
+    let d = dates[0];
+    for (let k=0; k<7; k++){ const t = new Date(d+'T12:00:00Z'); t.setUTCDate(t.getUTCDate()-1); d = t.toISOString().slice(0,10);
+      const pj = await pivFetch(d); if (pivHas(pj)){ prev = pivFrom(pj.on); break; } }
+  }
+  PIV5.days = dates.map((iso, k) => {
+    let on, carry = [];
+    if (pivHas(got[k])) on = pivFrom(got[k].on);
+    else { on = pivBlank(); if (prev) prev.forEach((r,p) => { if (r[95]){ on[p].fill(true); carry.push(p); } }); }
+    prev = on; return {date:iso, on, carry, saved:pivHas(got[k])};
+  });
+  PIV5.loading = false; draw();
+}
+function renderPiv5(){
+  const el = document.getElementById('piv');
+  if (!PIV5.days){ el.innerHTML = '<p class="pivsum">Cargando horarios de los pivotes de los últimos 5 días…</p>'; piv5Load(); return; }
+  const days = PIV5.days.concat([{date:D.date, on:PIV.on, carry:PIV.carry, today:true}]);
+  const nd = days.length, n = nd*96;
+  // same geometry as chart('c15') in the 5-day view, shifted by the horizontal offset between the two boxes
+  const c15 = document.getElementById('c15');
+  const W = Math.max(300, Math.round(c15.clientWidth || 340));
+  const off = c15.getBoundingClientRect().left - el.getBoundingClientRect().left, SW = Math.max(W, Math.round(el.clientWidth || W));
+  const pl = off + 34, pr = 6, bw = (W-34-pr)/n;
+  const rh = 12, sp = 4, H = PIV.n*(rh+sp), TOP = 22, BOT = 18;
+  const nowSlot = D.archive ? n : (nd-1)*96 + Math.max(0, D.n || 0);
+  const cOn = col('--onsite'), cOff = col('--grid'), cT = col('--ink3'), pk = '#E0A100';
+  const row = p => { const a = []; for (const d of days) for (let i=0;i<96;i++) a.push(!!d.on[p][i]); return a; };
+  const R = []; for (let p=0;p<PIV.n;p++) R.push(row(p));
+  const peak = i => i % 96 >= 72 && i % 96 < 92;
+  const lab = i => { const t = new Date(days[Math.floor(i/96)].date+'T12:00:00'), h = i % 96;
+    return t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric'}).replace('.','')+' · '+hhmm(h*15)+'–'+hhmm(h*15+15); };
+  PIV.g = {pl, bw, SW, H, TOP, BOT, rh, sp, cbw: bw, n, on: p => R[p], lab};
+  let s = '<svg class="pivsvg" viewBox="0 '+(-TOP)+' '+SW+' '+(H+TOP+BOT)+'" width="100%" style="display:block;touch-action:pan-y" role="img" aria-label="Horarios de los pivotes, últimos 5 días">';
+  s += '<defs><pattern id="piv5pk" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="'+pk+'" stroke-width="1.4" stroke-opacity="0.22"/></pattern></defs>';
+  for (let p=0;p<PIV.n;p++){ const y0 = p*(rh+sp);
+    s += '<text x="'+(pl-6)+'" y="'+(y0+rh/2+3.5)+'" text-anchor="end" font-size="10.5" fill="'+cT+'">P'+(p+1)+'</text>';
+    s += '<rect x="'+pl.toFixed(2)+'" y="'+y0+'" width="'+(n*bw).toFixed(2)+'" height="'+rh+'" rx="2" fill="'+cOff+'"/>'; }
+  // horario pico 18:00-23:00 of each day, same band as on the chart
+  for (let b=0; b<n; b+=96){ const xa = pl + (b+72)*bw, wd = 20*bw;
+    s += '<rect x="'+xa.toFixed(2)+'" y="-16" width="'+wd.toFixed(2)+'" height="'+(H-sp+16)+'" fill="'+pk+'" fill-opacity="0.08"/>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="-16" width="'+wd.toFixed(2)+'" height="'+(H-sp+16)+'" fill="url(#piv5pk)"/>';
+    s += '<rect x="'+xa.toFixed(2)+'" y="'+(H-sp+1)+'" width="'+wd.toFixed(2)+'" height="3" fill="'+pk+'"/>'; }
+  // running stretches drawn as one bar each; split where the colour or the "still to come" shading changes
+  for (let p=0;p<PIV.n;p++){ const y0 = p*(rh+sp), r = R[p];
+    let i = 0;
+    while (i < n){
+      if (!r[i]){ i++; continue; }
+      const k = (peak(i) ? 1 : 0) + (i >= nowSlot ? 2 : 0); let j = i + 1;
+      while (j < n && r[j] && ((peak(j) ? 1 : 0) + (j >= nowSlot ? 2 : 0)) === k && j % 96 !== 0) j++;
+      s += '<rect x="'+(pl+i*bw).toFixed(2)+'" y="'+y0+'" width="'+Math.max(1, (j-i)*bw).toFixed(2)+'" height="'+rh+'" fill="'+(k & 1 ? pk : cOn)+'"'+(k & 2 ? ' fill-opacity="0.35"' : '')+'/>';
+      i = j;
+    } }
+  for (let d=1; d<nd; d++){ const x = pl + d*96*bw;
+    s += '<line x1="'+x.toFixed(2)+'" x2="'+x.toFixed(2)+'" y1="-16" y2="'+(H-sp)+'" stroke="'+col('--axis')+'" stroke-width="1" stroke-dasharray="2 3"/>'; }
+  if (!D.archive && nowSlot < n){ const x = pl + nowSlot*bw;
+    s += '<line x1="'+x.toFixed(2)+'" x2="'+x.toFixed(2)+'" y1="-4" y2="'+(H-sp)+'" stroke="'+col('--solar')+'" stroke-width="1.5"/>'; }
+  days.forEach((d, k) => s += '<text x="'+(pl+(k*96+48)*bw).toFixed(1)+'" y="'+(H+12)+'" font-size="10.5" fill="'+cT+'" text-anchor="middle">'+dname(d.date)+'</text>');
+  s += '<line id="pivX" x1="0" x2="0" y1="-4" y2="'+(H-sp)+'" stroke="'+cT+'" stroke-width="1" stroke-dasharray="3 3" visibility="hidden" pointer-events="none"/>';
+  s += '<g id="pivT" visibility="hidden" pointer-events="none"><rect x="0" y="'+(-TOP+1)+'" height="17" rx="5" fill="'+col('--ink')+'"/>' +
+       '<text x="0" y="'+(-TOP+13.5)+'" font-size="11.5" font-weight="600" fill="'+col('--card')+'" text-anchor="middle"></text></g>';
+  s += '</svg>';
+  let h = '<div class="pivhd"><span><b>Pivotes de riego · últimos 5 días</b> <span class="pivkey"><i style="background:var(--onsite)"></i>encendido <i style="background:'+pk+';margin-left:8px"></i>encendido en horario pico</span></span></div>' + s;
+  // per-day totals; today only counts up to the last reading
+  const fh = x => x.toLocaleString('es-AR',{maximumFractionDigits:2});
+  let tb = '<table style="margin-top:10px"><thead><tr><th>Día</th><th>Horas-pivote</th><th>kWh estimados</th><th>Horas en pico</th><th>Pivotes</th></tr></thead><tbody>';
+  const notes = [];
+  days.forEach((d, k) => { let sl = 0, pks = 0, used = 0; const lim = d.today && !D.archive ? Math.max(0, D.n || 0) : 96;
+    for (let p=0;p<PIV.n;p++){ let c = 0; for (let i=0;i<lim;i++) if (d.on[p][i]){ c++; if (i >= 72 && i < 92) pks++; } sl += c; if (c) used++; }
+    tb += '<tr><td'+(d.today ? ' class="today"' : '')+'>'+dname(d.date)+(d.today && !D.archive ? ' (hasta '+D.last+')' : '')+'</td><td>'+fh(sl/4)+'</td><td>'+fmt(sl/4*PIV.kw,0)+'</td><td>'+fh(pks/4)+'</td><td>'+used+'</td></tr>';
+    if (d.carry && d.carry.length && !(d.today && pivDirty())) notes.push(dname(d.date)+': '+d.carry.map(p => 'P'+(p+1)).join(', ')); });
+  h += tb + '</tbody></table>';
+  if (notes.length) h += '<p class="pivsum">Siguen encendidos desde el día anterior (nadie marcó que se apagaron) &mdash; '+notes.join(' &middot; ')+'.</p>';
+  h += '<p class="pivsum">kWh estimados = horas-pivote &times; '+fmt(PIV.kw,0)+' kW por pivote. Los horarios se cargan y corrigen en la vista <b>'+(D.archive ? 'Día' : 'Hoy')+'</b>.</p>';
+  el.innerHTML = h;
+  const svg = el.querySelector('.pivsvg');
+  const move = ev => { const t = ev.touches ? ev.touches[0] : ev, r = svg.getBoundingClientRect(), g = PIV.g;
+    const x = (t.clientX - r.left) * g.SW / r.width, y = (t.clientY - r.top) * (g.H + g.TOP + g.BOT) / r.height - g.TOP;
+    const i = Math.floor((x - g.pl) / g.bw), p = Math.floor(y / (g.rh + g.sp));
+    pivHover(i >= 0 && i < g.n ? i : -1, p >= 0 && p < PIV.n ? p : -1, false); };
+  svg.addEventListener('mousemove', move); svg.addEventListener('mouseleave', () => pivHover(-1, -1, false));
+  svg.addEventListener('touchstart', move, {passive:true}); svg.addEventListener('touchmove', move, {passive:true});
+}
+// never wait forever for the save service: give up after 20 s (the caller then checks what actually got saved)
+async function pivPost(path, body, ms){
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms || 20000);
+  try {
+    const r = await fetch(PIV.api + path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:ctl.signal});
+    let j = {}; try { j = await r.json(); } catch(e) {}
+    return {status:r.status, j};
+  } finally { clearTimeout(t); }
+}
+async function pivAction(a){
+  PIV.msg = ''; PIV.cls = '';
+  if (a === 'edit'){
+    if (!PIV.api){ PIV.msg = 'La edición de horarios todavía no está habilitada.'; }
+    else { PIV.edit = true; PIV.pend = null; }
+  } else if (a === 'cancel'){
+    PIV.on = pivFrom(JSON.parse(PIV.saved)); PIV.edit = false; PIV.pend = null;
+  } else if (a === 'login'){
+    const pw = (document.getElementById('pivPw') || {}).value || '';
+    if (!pw){ PIV.msg = 'Escriba la contraseña.'; PIV.cls = 'err'; }
+    else { PIV.busy = true; draw();
+      try { const r = await pivPost('/check', {password:pw}, 15000);
+        if (r.status === 200){ PIV.pw = pw; pivSs('pivpw', pw); }
+        else { PIV.msg = r.status === 401 ? 'Contraseña incorrecta.' : 'No se pudo verificar la contraseña ('+r.status+').'; PIV.cls = 'err'; }
+      } catch(e){ PIV.msg = 'Sin respuesta del servicio de guardado. Intente de nuevo.'; PIV.cls = 'err'; }
+      PIV.busy = false; }
+  } else if (a === 'save'){
+    PIV.busy = true; PIV.pend = null; draw();
+    const on = pivTo(PIV.on);
+    try { const r = await pivPost('/pivotes', {date:D.date, on, password:PIV.pw});
+      if (r.status === 200){ PIV.saved = JSON.stringify(on); PIV.edit = false; PIV.msg = 'Guardado &#10003;'; PIV.cls = 'ok'; }
+      else if (r.status === 401){ PIV.pw = ''; pivSs('pivpw', null); PIV.msg = 'La contraseña no es válida; ingrésela de nuevo y vuelva a Guardar.'; PIV.cls = 'err'; }
+      else { PIV.msg = 'No se pudo guardar ('+(r.j.error || r.status)+'). Intente de nuevo.'; PIV.cls = 'err'; }
+    } catch(e){
+      // no answer (timeout or dropped connection): the save may still have gone through, so read the day back and compare
+      let ok = false;
+      try { const j = await pivFetch(D.date); ok = !!(j && Array.isArray(j.on) && JSON.stringify(j.on) === JSON.stringify(on)); } catch(e2) {}
+      if (ok){ PIV.saved = JSON.stringify(on); PIV.edit = false; PIV.msg = 'Guardado &#10003;'; PIV.cls = 'ok'; }
+      else { PIV.msg = 'El servicio de guardado no respondió y los horarios no quedaron guardados. Vuelva a tocar Guardar.'; PIV.cls = 'err'; }
+    }
+    PIV.busy = false;
+  }
+  draw();
+}
+document.getElementById('piv').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-a]'); if (b){ if (!b.disabled) pivAction(b.dataset.a); return; }
+  if (!pivCanEdit() || PIV.busy) return;
+  const cell = ev.target.closest('rect[data-p]'); if (!cell) return;
+  const p = +cell.dataset.p, i = +cell.dataset.i, r = PIV.on[p];
+  PIV.msg = ''; PIV.pend = null;
+  const start = r[i] && (i === 0 || !r[i-1]), stop = !r[i] && i > 0 && r[i-1];
+  if (start){ for (let k=i; k<96 && r[k]; k++) r[k] = false; }              // remove this run
+  else if (stop){ for (let k=i; k<96 && !r[k]; k++) r[k] = true; }          // remove the turn-off: keeps running
+  else if (r[i]){ for (let k=i; k<96 && r[k]; k++) r[k] = false; }          // turn off here (red block)
+  else { for (let k=i; k<96 && !r[k]; k++) r[k] = true; }                   // turn on here: green until turned off
+  draw();
+});
+document.getElementById('opBox').addEventListener('toggle', () => draw());
+window.addEventListener('beforeunload', e => { if (pivDirty()){ e.preventDefault(); e.returnValue = ''; } });
+(async function pivInit(){
+  try { const c = await fetch(PIV_ROOT+'pivotes/config.json?t='+Date.now(), {cache:'no-store'});
+    if (c.ok){ const j = await c.json(); if (j.n) PIV.n = Math.max(1, Math.min(20, j.n|0)); if (j.kw) PIV.kw = +j.kw || PIV.kw; if (j.api) PIV.api = String(j.api).replace(/\/+$/,''); } } catch(e) {}
+  const j = await pivFetch(D.date);
+  PIV.on = pivFrom(j && j.on); PIV.carry = [];
+  if (!(j && Array.isArray(j.on) && j.on.length)){
+    // nothing saved for this day: pivots still running at the end of the last saved day keep running
+    // from 00:00 until someone marks them stopped (looks back up to 7 days)
+    let d = D.date;
+    for (let k=0; k<7; k++){
+      const t = new Date(d+'T12:00:00Z'); t.setUTCDate(t.getUTCDate()-1); d = t.toISOString().slice(0,10);
+      const pj = await pivFetch(d);
+      if (pj && Array.isArray(pj.on) && pj.on.length){
+        pj.on.forEach((sx,p) => { if (p < PIV.n && typeof sx === 'string' && sx[95] === '1'){ PIV.on[p].fill(true); PIV.carry.push(p); } });
+        break;
+      }
+    }
+  }
+  PIV.saved = JSON.stringify(pivTo(PIV.on)); PIV.pw = pivSs('pivpw'); PIV.loaded = true;
+  draw();
+})();
+async function pivFetch(date){
+  let j = null;
+  if (PIV.api){ const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+    try { const r = await fetch(PIV.api+'/pivotes?date='+date, {cache:'no-store', signal:ctl.signal}); if (r.ok) j = await r.json(); } catch(e) {}
+    clearTimeout(t); }
+  if (!j){ try { const r = await fetch(PIV_ROOT+'pivotes/'+date+'.json?t='+Date.now(), {cache:'no-store'}); if (r.ok) j = await r.json(); } catch(e) {} }
+  return j;
+}
+</script>
+</body>
+</html>
