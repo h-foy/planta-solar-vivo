@@ -4,14 +4,14 @@
    "nombre": "Medidor de la planta solar",
    "ultima": "2026-10-20 14:30",
    "ok": false,
-   "intento": "2026-10-20 17:40",
+   "intento": "2026-10-20 17:45",
    "error": "el equipo de comunicación rechazó la conexión (ocupado o sin servicio)"
   },
   "DAGSR01P": {
    "nombre": "Medidor de entrada (red)",
-   "ultima": "2026-10-20 17:30",
+   "ultima": "2026-10-20 17:45",
    "ok": true
   }
  },
- "actualizado": "2026-10-20 17:40"
+ "actualizado": "2026-10-20 17:45"
 }
