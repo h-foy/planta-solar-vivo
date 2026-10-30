@@ -7,11 +7,9 @@
   },
   "DAGSR01P": {
    "nombre": "Medidor de entrada (red)",
-   "ultima": "2026-10-30 07:00",
-   "ok": false,
-   "intento": "2026-10-30 07:15",
-   "error": "sin respuesta (tiempo agotado)"
+   "ultima": "2026-10-30 07:15",
+   "ok": true
   }
  },
- "actualizado": "2026-10-30 07:15"
+ "actualizado": "2026-10-30 07:20"
 }
