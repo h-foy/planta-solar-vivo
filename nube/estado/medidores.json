@@ -3,17 +3,15 @@
   "AGRIM02P": {
    "nombre": "Medidor de la planta solar",
    "ultima": "2026-11-02 21:00",
-   "ok": false,
-   "intento": "2026-11-02 21:05",
-   "error": "ConnectionResetError: [Errno 104] Connection reset by peer"
+   "ok": true
   },
   "DAGSR01P": {
    "nombre": "Medidor de entrada (red)",
    "ultima": "2026-11-02 07:00",
    "ok": false,
-   "intento": "2026-11-02 21:05",
+   "intento": "2026-11-02 21:10",
    "error": "el equipo de comunicación rechazó la conexión (ocupado o sin servicio)"
   }
  },
- "actualizado": "2026-11-02 21:05"
+ "actualizado": "2026-11-02 21:10"
 }
