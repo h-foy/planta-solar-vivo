@@ -53,7 +53,10 @@ def page_state(full=False):
     d = re.search(r'"date":"(\d{4}-\d{2}-\d{2})"', html)
     last = re.search(r'"last":"(\d{2}:\d{2})"', html)
     sol = re.search(r'"solLast":"(\d{2}:\d{2})?"', html)
+    grid = re.search(r'"gridLast":"(\d{2}:\d{2})?"', html)   # newer pages: "last" is the newest of either meter
     d, last = (d.group(1) if d else None), (last.group(1) if last else None)
+    if grid:
+        last = grid.group(1)
     sol_last = (sol.group(1) if sol else last) if html else None    # older pages had no separate solar time
     return (d, last, sol_last) if full else (d, last)
 

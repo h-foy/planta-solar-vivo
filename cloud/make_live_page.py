@@ -30,8 +30,8 @@ PAT = re.compile(r'(AGRIM02P|DAGSR01P)_(\d{8})(?:_hasta_(\d{4}))?\.PRN$', re.I)
 
 
 def newest_pair(src):
-    """Newest date that has the grid meter (DAGSR01P), with the best file of each meter for that date.
-    The solar meter's file may be missing or shorter when its gateway did not answer: (day, ag_path|None, ds_path)."""
+    """Newest date that has either meter, with the best file of each meter for that date.
+    Either meter's file may be missing or shorter when its gateway did not answer: (day, ag_path|None, ds_path|None)."""
     found = {}
     for p in glob.glob(os.path.join(src, '*.PRN')):
         m = PAT.search(os.path.basename(p))
@@ -42,27 +42,42 @@ def newest_pair(src):
         cur = found.setdefault(day, {}).get(meter)
         if cur is None or rank > cur[0]:
             found[day][meter] = (rank, p)
-    days = sorted(d for d, v in found.items() if 'DAGSR01P' in v)
+    days = sorted(found)
     if not days:
-        raise SystemExit('no date in %s has the grid meter' % src)
+        raise SystemExit('no meter file in %s' % src)
     d = days[-1]
-    ag = found[d].get('AGRIM02P')
-    return d, (ag[1] if ag else None), found[d]['DAGSR01P'][1]
+    ag, gr = found[d].get('AGRIM02P'), found[d].get('DAGSR01P')
+    return d, (ag[1] if ag else None), (gr[1] if gr else None)
+
+
+def _previous_page(prev_page, date_iso):
+    try:
+        with open(prev_page, encoding='utf-8') as f:
+            html = f.read()
+        old = json.loads(re.search(r'const D = (\{.*?\});\n', html, re.S).group(1))
+        return old if old.get('date') == date_iso else None
+    except (OSError, AttributeError, ValueError, TypeError):
+        return None
 
 
 def previous_solar(prev_page, date_iso):
     """Solar values already published for this date (used when the solar meter does not answer now)."""
-    try:
-        with open(prev_page, encoding='utf-8') as f:
-            html = f.read()
-        m = re.search(r'const D = (\{.*?\});\n', html, re.S)
-        old = json.loads(m.group(1))
-        if old.get('date') == date_iso:
-            sol = old.get('sol', [])
-            return sol[:old.get('ns', old.get('n', len(sol)))]
-    except (OSError, AttributeError, ValueError):
-        pass
-    return []
+    old = _previous_page(prev_page, date_iso)
+    if not old:
+        return []
+    sol = old.get('sol', [])
+    return sol[:old.get('ns', old.get('n', len(sol)))]
+
+
+def previous_grid(prev_page, date_iso):
+    """Grid meter values (injected, bought) already published for this date
+    (used when the grid meter does not answer now): list of (inj, grd)."""
+    old = _previous_page(prev_page, date_iso)
+    if not old:
+        return []
+    ng = old.get('ng', old.get('n', 0))
+    inj, grd = old.get('inj', []), old.get('grd', [])
+    return list(zip(inj[:ng], grd[:ng]))
 
 
 def history(dirs, today, ndays=4):
@@ -111,24 +126,32 @@ def camera_url():
 def build(src, dest, snapshot=False, hist_dirs=(), prev_page=None):
     day, ag_p, ds_p = newest_pair(src)
     date_iso = f'{day[:4]}-{day[4:6]}-{day[6:]}'
-    ds = parse(ds_p)
-    n = min(len(ds), 96)
     r3 = lambda x: round(x, 3)
-    sol = [r3(r[0]) for r in parse(ag_p)][:n] if ag_p else []
+    grid = [(r3(r[0]), r3(r[1])) for r in parse(ds_p)][:96] if ds_p else []
+    sol = [r3(r[0]) for r in parse(ag_p)][:96] if ag_p else []
     if prev_page:                                   # keep what was already published if it is longer
-        old = previous_solar(prev_page, date_iso)[:n]
+        old = previous_solar(prev_page, date_iso)[:96]
         if len(old) > len(sol):
             sol = old
-    ns = len(sol)                                   # intervals with solar data (can be < n)
-    inj = [r3(ds[i][0]) for i in range(n)]
-    grd = [r3(ds[i][1]) for i in range(n)]
+        oldg = previous_grid(prev_page, date_iso)[:96]
+        if len(oldg) > len(grid):
+            grid = oldg
+    ns = len(sol)                                   # intervals with solar data
+    ng = len(grid)                                  # intervals with grid data
+    n = max(ns, ng)                                 # newest reading of either meter
+    if n == 0:
+        raise SystemExit('no readings yet for %s' % date_iso)
+    inj = [g[0] for g in grid]
+    grd = [g[1] for g in grid]
     hhmm = lambda k: '24:00' if k == 96 else (dt.datetime.strptime(day, '%Y%m%d') + dt.timedelta(minutes=15 * k)).strftime('%H:%M')
     data = {
         'date': date_iso,
         'n': n,
         'ns': ns,
+        'ng': ng,
         'last': hhmm(n),
         'solLast': hhmm(ns) if ns else '',
+        'gridLast': hhmm(ng) if ng else '',
         'built': dt.datetime.now().strftime('%Y-%m-%d %H:%M'),
         'sol': sol, 'inj': inj, 'grd': grd,
         'snapshot': snapshot,
@@ -150,7 +173,8 @@ def build(src, dest, snapshot=False, hist_dirs=(), prev_page=None):
     with open(tmp, 'w', encoding='utf-8') as f:
         f.write(html)
     os.replace(tmp, out)
-    print(f'{data["date"]}  {n}/96 intervals, up to {data["last"]} (solar up to {data["solLast"] or "none"}), history days: '
+    print(f'{data["date"]}  {n}/96 intervals, up to {data["last"]} (solar up to {data["solLast"] or "none"}, '
+          f'grid up to {data["gridLast"] or "none"}), history days: '
           f'{", ".join(h["date"][5:] for h in data["hist"]) or "none"}  ->  {out}')
     if hist_dirs and not snapshot:
         build_day_pages([d for d in hist_dirs if d], dest)
@@ -531,23 +555,25 @@ const fmt = (x,d=1) => x==null ? '–' : x.toLocaleString('es-AR',{minimumFracti
 const hhmm = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 
 // ---- derive series (null = no reading yet) ----
-const N = 96, n = D.n, ns = (D.ns==null ? n : D.ns);   // ns: intervals that also have solar data
+// n: newest reading of either meter; ns / ng: intervals with solar / grid data; nb: intervals with both
+const N = 96, n = D.n, ns = (D.ns==null ? n : D.ns), ng = (D.ng==null ? n : D.ng), nb = Math.min(ns, ng);
+const bLast = hhmm(nb*15);
 const q = {sol:[],inj:[],grd:[],onsite:[]};
 for (let i=0;i<N;i++){
-  const g = i<n ? D.grd[i] : null, j = i<n ? D.inj[i] : null, s = i<ns ? D.sol[i] : null;
-  q.grd.push(g); q.inj.push(j); q.sol.push(s); q.onsite.push(s==null ? null : Math.max(0, s-j));
+  const g = i<ng ? D.grd[i] : null, j = i<ng ? D.inj[i] : null, s = i<ns ? D.sol[i] : null;
+  q.grd.push(g); q.inj.push(j); q.sol.push(s); q.onsite.push(s==null || j==null ? null : Math.max(0, s-j));
 }
 const H = {sol:[],inj:[],grd:[],onsite:[]};
-const nh = Math.floor(n/4), nhs = Math.floor(ns/4);
+const nhg = Math.floor(ng/4), nhs = Math.floor(ns/4), nhb = Math.floor(nb/4);
 for (let h=0;h<24;h++) for (const k in H){
-  const ok = (k==='sol'||k==='onsite') ? h<nhs : h<nh;
+  const ok = k==='sol' ? h<nhs : k==='onsite' ? h<nhb : h<nhg;
   H[k].push(ok ? q[k].slice(h*4,h*4+4).reduce((a,b)=>a+b,0) : null);
 }
 const sum = a => a.reduce((t,x)=>t+(x||0),0);
 const T = {sol:sum(q.sol), inj:sum(q.inj), grd:sum(q.grd), onsite:sum(q.onsite)};
 T.use = T.onsite + T.grd;
-// same sums but only over the stretch that has both meters (for honest ratios when solar data is behind)
-const W = {sol:sum(q.sol.slice(0,ns)), inj:sum(q.inj.slice(0,ns)), grd:sum(q.grd.slice(0,ns)), onsite:sum(q.onsite.slice(0,ns))};
+// same sums but only over the stretch that has both meters (for honest ratios when one meter is behind)
+const W = {sol:sum(q.sol.slice(0,nb)), inj:sum(q.inj.slice(0,nb)), grd:sum(q.grd.slice(0,nb)), onsite:sum(q.onsite.slice(0,nb))};
 W.use = W.onsite + W.grd;
 
 // ---- header ----
@@ -576,6 +602,9 @@ if (D.archive){
   } else if (n - ns >= 2) {
     msg = 'El medidor de la planta solar no responde'+(D.solLast ? ' desde las '+D.solLast : '')+
           '. Se muestran los datos de la red al día; la parte solar se completará sola cuando vuelva la conexión.';
+  } else if (n - ng >= 2) {
+    msg = 'El medidor de entrada (red) no responde'+(D.gridLast ? ' desde las '+D.gridLast : '')+
+          '. Se muestra la producción solar al día; compra, inyección y consumo se completarán solos cuando vuelva la conexión.';
   }
   if (msg){ document.getElementById('staleText').textContent = msg; document.getElementById('stale').classList.add('on'); }
   // which meter is failing, and since when (nube/estado/medidores.json, written by every update run even when the page can't be rebuilt)
@@ -589,8 +618,10 @@ if (D.archive){
                   : '&#10007; <b>'+nm+'</b>: sin conexión &middot; última lectura '+esc(when(m.ultima))+(m.intento ? ' &middot; último intento '+esc(when(m.intento)) : '')+(m.error ? ' ('+esc(m.error)+')' : ''); });
     if (!lines.length) return;
     const bad = order.filter(([k]) => j.medidores[k] && !j.medidores[k].ok).map(([, nm]) => nm.toLowerCase());
-    const head = bad.length ? 'Sin lecturas nuevas desde las '+D.last+': '+(bad.length === 2 ? 'los dos medidores no responden.' : 'el '+bad[0]+' no responde.')
-                            : 'Sin lecturas nuevas desde las '+D.last+'.';
+    const head = bad.length === 2 ? 'Sin lecturas nuevas desde las '+D.last+': los dos medidores no responden.'
+               : bad.length === 1 ? (nb < n ? 'El '+bad[0]+' no responde desde las '+bLast+'; el otro medidor sigue al día (lecturas hasta las '+D.last+').'
+                                            : 'Sin lecturas nuevas desde las '+D.last+': el '+bad[0]+' no responde.')
+               : 'Sin lecturas nuevas desde las '+D.last+'.';
     document.getElementById('staleText').innerHTML = esc(head)+'<br>'+lines.join('<br>')+'<br><small>La página se pondrá al día sola cuando vuelva la conexión.</small>';
   }).catch(() => {});
 })();
@@ -600,7 +631,8 @@ const pct = (a,b) => b>0 ? Math.round(a/b*100)+'%' : '–';
 const lastKw = ns>0 ? D.sol[ns-1]*4 : 0;
 const peakI = D.sol.reduce((b,v,i,a) => v > a[b] ? i : b, 0), peakKw = (D.sol[peakI]||0)*4;
 const solNote = ns < n ? (ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares todavía') : null;
-const upto = ns < n ? ' (hasta las '+(D.solLast||'00:00')+')' : '';
+const gridNote = ng < n ? (ng ? 'hasta las '+D.gridLast+' (el medidor de red no responde)' : 'sin datos de la red todavía') : null;
+const upto = nb < n ? ' (hasta las '+bLast+')' : '';
 // Round the measured totals once, then build the derived ones from those rounded numbers,
 // so what is shown always adds up: consumo = comprada + consumida, producción = consumida + inyectada.
 const rset = X => { const r = {sol:Math.round(X.sol), grd:Math.round(X.grd), inj:Math.round(X.inj)};
@@ -618,13 +650,13 @@ const HR = [], TT = {sol:0, onsite:0, grd:0, inj:0, use:0};
     HR.push(r); for (const k in TT) TT[k] += r[k] || 0;
   }
   for (const k in TT) TT[k] /= 10; }
-const RT = rset(TT), RW = ns<n ? rset(W) : RT;
+const RT = rset(TT), RW = nb<n ? rset(W) : RT;
 const tiles = [
-  ['Consumo total del sitio', fmt(ns<n ? RW.use : RT.use,0)+'<small>kWh</small>', ns<n ? 'hasta las '+(D.solLast||'00:00')+' (falta el dato solar)' : 'solar consumida + comprada a la red', null],
-  ['Comprada a la red', fmt(RT.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(RW.grd,RW.use)+upto, '--grid-in'],
-  ['Solar consumida en sitio', fmt(RT.onsite,0)+'<small>kWh</small>', solNote || ('Autoconsumo '+pct(RT.onsite,RT.sol)), '--onsite'],
+  ['Consumo total del sitio', fmt(nb<n ? RW.use : RT.use,0)+'<small>kWh</small>', nb<n ? 'hasta las '+bLast+(ns<ng ? ' (falta el dato solar)' : ' (falta el dato de la red)') : 'solar consumida + comprada a la red', null],
+  ['Comprada a la red', fmt(RT.grd,0)+'<small>kWh</small>', gridNote || ('Dependencia de la red '+pct(RW.grd,RW.use)+upto), '--grid-in'],
+  ['Solar consumida en sitio', fmt(RT.onsite,0)+'<small>kWh</small>', solNote || gridNote || ('Autoconsumo '+pct(RT.onsite,RT.sol)), '--onsite'],
   ['Producción solar', fmt(RT.sol,0)+'<small>kWh</small>', solNote || (D.archive ? 'Pico '+fmt(peakKw,0)+' kW a las '+hhmm(peakI*15+15) : 'Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
-  ['Inyectada a la red', fmt(RT.inj,0)+'<small>kWh</small>', pct(RW.inj,RW.sol)+' de la producción solar'+upto, '--inject'],
+  ['Inyectada a la red', fmt(RT.inj,0)+'<small>kWh</small>', ng<n ? gridNote : pct(RW.inj,RW.sol)+' de la producción solar'+upto, '--inject'],
   ['Cobertura solar', pct(RW.onsite,RW.use), 'del consumo cubierto por solar'+upto, null],
 ];
 document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c]) =>
@@ -701,6 +733,12 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     if (a0>=0){ const xa = pl+a0*bw, xb = pl+(a1+1)*bw;
       s += '<rect x="'+xa+'" y="'+pt+'" width="'+(xb-xa)+'" height="'+ih+'" fill="'+col('--ink3')+'" opacity="0.10"/>';
       if (xb-xa > 60) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" fill="'+col('--ink2')+'">sin datos solares</text>'; } }
+  // and the stretch that has solar readings but no grid readings (grid meter not answering): only the solar line is drawn
+  { let a0 = -1, a1 = -1;
+    for (let i=0;i<slots;i++){ if (d.grd[i]==null && d.sol[i]!=null){ if (a0<0) a0=i; a1=i; } }
+    if (a0>=0){ const xa = pl+a0*bw, xb = pl+(a1+1)*bw;
+      s += '<rect x="'+xa+'" y="'+pt+'" width="'+(xb-xa)+'" height="'+ih+'" fill="'+col('--ink3')+'" opacity="0.10"/>';
+      if (xb-xa > 40) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" fill="'+col('--ink2')+'">'+(xb-xa > 110 ? 'sin datos de la red' : 'sin red')+'</text>'; } }
   // rounded-end bar path: rounded at the far end only, anchored to the baseline
   const bar = (x, y1, y2, c, roundTop) => {
     const h = Math.abs(y2-y1); if (h < .5) return '';
@@ -783,7 +821,7 @@ const F = (function(){
     for (let i=0;i<96;i++){
       const s0 = k4(sol[i]), j = k4(inj[i]), g = k4(grd[i]);
       f.sol.push(s0); f.inj.push(j); f.grd.push(g);
-      f.onsite.push(s0==null ? null : Math.max(0, s0-(j||0)));
+      f.onsite.push(s0==null || j==null ? null : Math.max(0, s0-j));
       f.lab.push([iso,i]);
     }
   };
