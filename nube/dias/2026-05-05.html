@@ -253,23 +253,25 @@ const fmt = (x,d=1) => x==null ? '–' : x.toLocaleString('es-AR',{minimumFracti
 const hhmm = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 
 // ---- derive series (null = no reading yet) ----
-const N = 96, n = D.n, ns = (D.ns==null ? n : D.ns);   // ns: intervals that also have solar data
+// n: newest reading of either meter; ns / ng: intervals with solar / grid data; nb: intervals with both
+const N = 96, n = D.n, ns = (D.ns==null ? n : D.ns), ng = (D.ng==null ? n : D.ng), nb = Math.min(ns, ng);
+const bLast = hhmm(nb*15);
 const q = {sol:[],inj:[],grd:[],onsite:[]};
 for (let i=0;i<N;i++){
-  const g = i<n ? D.grd[i] : null, j = i<n ? D.inj[i] : null, s = i<ns ? D.sol[i] : null;
-  q.grd.push(g); q.inj.push(j); q.sol.push(s); q.onsite.push(s==null ? null : Math.max(0, s-j));
+  const g = i<ng ? D.grd[i] : null, j = i<ng ? D.inj[i] : null, s = i<ns ? D.sol[i] : null;
+  q.grd.push(g); q.inj.push(j); q.sol.push(s); q.onsite.push(s==null || j==null ? null : Math.max(0, s-j));
 }
 const H = {sol:[],inj:[],grd:[],onsite:[]};
-const nh = Math.floor(n/4), nhs = Math.floor(ns/4);
+const nhg = Math.floor(ng/4), nhs = Math.floor(ns/4), nhb = Math.floor(nb/4);
 for (let h=0;h<24;h++) for (const k in H){
-  const ok = (k==='sol'||k==='onsite') ? h<nhs : h<nh;
+  const ok = k==='sol' ? h<nhs : k==='onsite' ? h<nhb : h<nhg;
   H[k].push(ok ? q[k].slice(h*4,h*4+4).reduce((a,b)=>a+b,0) : null);
 }
 const sum = a => a.reduce((t,x)=>t+(x||0),0);
 const T = {sol:sum(q.sol), inj:sum(q.inj), grd:sum(q.grd), onsite:sum(q.onsite)};
 T.use = T.onsite + T.grd;
-// same sums but only over the stretch that has both meters (for honest ratios when solar data is behind)
-const W = {sol:sum(q.sol.slice(0,ns)), inj:sum(q.inj.slice(0,ns)), grd:sum(q.grd.slice(0,ns)), onsite:sum(q.onsite.slice(0,ns))};
+// same sums but only over the stretch that has both meters (for honest ratios when one meter is behind)
+const W = {sol:sum(q.sol.slice(0,nb)), inj:sum(q.inj.slice(0,nb)), grd:sum(q.grd.slice(0,nb)), onsite:sum(q.onsite.slice(0,nb))};
 W.use = W.onsite + W.grd;
 
 // ---- header ----
@@ -298,6 +300,9 @@ if (D.archive){
   } else if (n - ns >= 2) {
     msg = 'El medidor de la planta solar no responde'+(D.solLast ? ' desde las '+D.solLast : '')+
           '. Se muestran los datos de la red al día; la parte solar se completará sola cuando vuelva la conexión.';
+  } else if (n - ng >= 2) {
+    msg = 'El medidor de entrada (red) no responde'+(D.gridLast ? ' desde las '+D.gridLast : '')+
+          '. Se muestra la producción solar al día; compra, inyección y consumo se completarán solos cuando vuelva la conexión.';
   }
   if (msg){ document.getElementById('staleText').textContent = msg; document.getElementById('stale').classList.add('on'); }
   // which meter is failing, and since when (nube/estado/medidores.json, written by every update run even when the page can't be rebuilt)
@@ -311,8 +316,10 @@ if (D.archive){
                   : '&#10007; <b>'+nm+'</b>: sin conexión &middot; última lectura '+esc(when(m.ultima))+(m.intento ? ' &middot; último intento '+esc(when(m.intento)) : '')+(m.error ? ' ('+esc(m.error)+')' : ''); });
     if (!lines.length) return;
     const bad = order.filter(([k]) => j.medidores[k] && !j.medidores[k].ok).map(([, nm]) => nm.toLowerCase());
-    const head = bad.length ? 'Sin lecturas nuevas desde las '+D.last+': '+(bad.length === 2 ? 'los dos medidores no responden.' : 'el '+bad[0]+' no responde.')
-                            : 'Sin lecturas nuevas desde las '+D.last+'.';
+    const head = bad.length === 2 ? 'Sin lecturas nuevas desde las '+D.last+': los dos medidores no responden.'
+               : bad.length === 1 ? (nb < n ? 'El '+bad[0]+' no responde desde las '+bLast+'; el otro medidor sigue al día (lecturas hasta las '+D.last+').'
+                                            : 'Sin lecturas nuevas desde las '+D.last+': el '+bad[0]+' no responde.')
+               : 'Sin lecturas nuevas desde las '+D.last+'.';
     document.getElementById('staleText').innerHTML = esc(head)+'<br>'+lines.join('<br>')+'<br><small>La página se pondrá al día sola cuando vuelva la conexión.</small>';
   }).catch(() => {});
 })();
@@ -322,7 +329,8 @@ const pct = (a,b) => b>0 ? Math.round(a/b*100)+'%' : '–';
 const lastKw = ns>0 ? D.sol[ns-1]*4 : 0;
 const peakI = D.sol.reduce((b,v,i,a) => v > a[b] ? i : b, 0), peakKw = (D.sol[peakI]||0)*4;
 const solNote = ns < n ? (ns ? 'datos solares hasta las '+D.solLast : 'sin datos solares todavía') : null;
-const upto = ns < n ? ' (hasta las '+(D.solLast||'00:00')+')' : '';
+const gridNote = ng < n ? (ng ? 'hasta las '+D.gridLast+' (el medidor de red no responde)' : 'sin datos de la red todavía') : null;
+const upto = nb < n ? ' (hasta las '+bLast+')' : '';
 // Round the measured totals once, then build the derived ones from those rounded numbers,
 // so what is shown always adds up: consumo = comprada + consumida, producción = consumida + inyectada.
 const rset = X => { const r = {sol:Math.round(X.sol), grd:Math.round(X.grd), inj:Math.round(X.inj)};
@@ -340,13 +348,13 @@ const HR = [], TT = {sol:0, onsite:0, grd:0, inj:0, use:0};
     HR.push(r); for (const k in TT) TT[k] += r[k] || 0;
   }
   for (const k in TT) TT[k] /= 10; }
-const RT = rset(TT), RW = ns<n ? rset(W) : RT;
+const RT = rset(TT), RW = nb<n ? rset(W) : RT;
 const tiles = [
-  ['Consumo total del sitio', fmt(ns<n ? RW.use : RT.use,0)+'<small>kWh</small>', ns<n ? 'hasta las '+(D.solLast||'00:00')+' (falta el dato solar)' : 'solar consumida + comprada a la red', null],
-  ['Comprada a la red', fmt(RT.grd,0)+'<small>kWh</small>', 'Dependencia de la red '+pct(RW.grd,RW.use)+upto, '--grid-in'],
-  ['Solar consumida en sitio', fmt(RT.onsite,0)+'<small>kWh</small>', solNote || ('Autoconsumo '+pct(RT.onsite,RT.sol)), '--onsite'],
+  ['Consumo total del sitio', fmt(nb<n ? RW.use : RT.use,0)+'<small>kWh</small>', nb<n ? 'hasta las '+bLast+(ns<ng ? ' (falta el dato solar)' : ' (falta el dato de la red)') : 'solar consumida + comprada a la red', null],
+  ['Comprada a la red', fmt(RT.grd,0)+'<small>kWh</small>', gridNote || ('Dependencia de la red '+pct(RW.grd,RW.use)+upto), '--grid-in'],
+  ['Solar consumida en sitio', fmt(RT.onsite,0)+'<small>kWh</small>', solNote || gridNote || ('Autoconsumo '+pct(RT.onsite,RT.sol)), '--onsite'],
   ['Producción solar', fmt(RT.sol,0)+'<small>kWh</small>', solNote || (D.archive ? 'Pico '+fmt(peakKw,0)+' kW a las '+hhmm(peakI*15+15) : 'Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
-  ['Inyectada a la red', fmt(RT.inj,0)+'<small>kWh</small>', pct(RW.inj,RW.sol)+' de la producción solar'+upto, '--inject'],
+  ['Inyectada a la red', fmt(RT.inj,0)+'<small>kWh</small>', ng<n ? gridNote : pct(RW.inj,RW.sol)+' de la producción solar'+upto, '--inject'],
   ['Cobertura solar', pct(RW.onsite,RW.use), 'del consumo cubierto por solar'+upto, null],
 ];
 document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c]) =>
@@ -423,6 +431,12 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     if (a0>=0){ const xa = pl+a0*bw, xb = pl+(a1+1)*bw;
       s += '<rect x="'+xa+'" y="'+pt+'" width="'+(xb-xa)+'" height="'+ih+'" fill="'+col('--ink3')+'" opacity="0.10"/>';
       if (xb-xa > 60) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" fill="'+col('--ink2')+'">sin datos solares</text>'; } }
+  // and the stretch that has solar readings but no grid readings (grid meter not answering): only the solar line is drawn
+  { let a0 = -1, a1 = -1;
+    for (let i=0;i<slots;i++){ if (d.grd[i]==null && d.sol[i]!=null){ if (a0<0) a0=i; a1=i; } }
+    if (a0>=0){ const xa = pl+a0*bw, xb = pl+(a1+1)*bw;
+      s += '<rect x="'+xa+'" y="'+pt+'" width="'+(xb-xa)+'" height="'+ih+'" fill="'+col('--ink3')+'" opacity="0.10"/>';
+      if (xb-xa > 40) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" fill="'+col('--ink2')+'">'+(xb-xa > 110 ? 'sin datos de la red' : 'sin red')+'</text>'; } }
   // rounded-end bar path: rounded at the far end only, anchored to the baseline
   const bar = (x, y1, y2, c, roundTop) => {
     const h = Math.abs(y2-y1); if (h < .5) return '';
@@ -505,7 +519,7 @@ const F = (function(){
     for (let i=0;i<96;i++){
       const s0 = k4(sol[i]), j = k4(inj[i]), g = k4(grd[i]);
       f.sol.push(s0); f.inj.push(j); f.grd.push(g);
-      f.onsite.push(s0==null ? null : Math.max(0, s0-(j||0)));
+      f.onsite.push(s0==null || j==null ? null : Math.max(0, s0-j));
       f.lab.push([iso,i]);
     }
   };
