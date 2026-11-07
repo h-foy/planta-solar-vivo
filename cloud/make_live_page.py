@@ -738,7 +738,11 @@ function chart(el, d, slots, labelEvery, labelFn, tipLabel, opt){
     for (let i=0;i<slots;i++){ if (d.grd[i]==null && d.sol[i]!=null){ if (a0<0) a0=i; a1=i; } }
     if (a0>=0){ const xa = pl+a0*bw, xb = pl+(a1+1)*bw;
       s += '<rect x="'+xa+'" y="'+pt+'" width="'+(xb-xa)+'" height="'+ih+'" fill="'+col('--ink3')+'" opacity="0.10"/>';
-      if (xb-xa > 40) s += '<text x="'+((xa+xb)/2)+'" y="'+(pt+12)+'" text-anchor="middle" font-size="10.5" fill="'+col('--ink2')+'">'+(xb-xa > 110 ? 'sin datos de la red' : 'sin red')+'</text>'; } }
+      const xm = (xa+xb)/2, tx = '<text x="'+xm+'" text-anchor="middle" font-size="10.5" fill="'+col('--ink2')+'"';
+      if (xb-xa > 125) s += tx+' y="'+(pt+12)+'">sin medidor de entrada</text>';
+      else if (xb-xa > 62) s += tx+' y="'+(pt+12)+'">sin medidor</text>'+tx+' y="'+(pt+25)+'">de entrada</text>';
+      else if (xb-xa > 14){ const tl = '<text x="'+(xa+3)+'" text-anchor="start" font-size="10.5" fill="'+col('--ink2')+'"';   // narrow (phone): run into the blank area to the right
+        s += tl+' y="'+(pt+12)+'">sin medidor</text>'+tl+' y="'+(pt+25)+'">de entrada</text>'; } } }
   // rounded-end bar path: rounded at the far end only, anchored to the baseline
   const bar = (x, y1, y2, c, roundTop) => {
     const h = Math.abs(y2-y1); if (h < .5) return '';
