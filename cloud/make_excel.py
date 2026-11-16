@@ -1,7 +1,8 @@
 """Monthly Excel downloads for the live page: <page>/excel/YYYY-MM.xlsx, plus excel/index.json (list of months).
 
 Each workbook has two sheets, built from the complete days archived in data/:
-  Resumen diario   one row per day (solar, on-site, bought from grid, injected, total use, solar coverage) + month total
+  Resumen diario   one row per day (solar, on-site, bought from grid, injected, total use, solar coverage,
+                   solar production / total use) + month total
   Lecturas 15 min  every 15-minute reading of the month
 
 Same definitions as the page:
@@ -142,7 +143,8 @@ def month_workbook(ym, days):
 
     # --- Resumen diario ---
     hdr = ['Fecha', 'Producción solar (kWh)', 'Solar consumida en sitio (kWh)', 'Comprada a la red (kWh)',
-           'Inyectada a la red (kWh)', 'Consumo total del sitio (kWh)', 'Cobertura solar (%)']
+           'Inyectada a la red (kWh)', 'Consumo total del sitio (kWh)', 'Cobertura solar (%)',
+           'Producción solar ÷ consumo total (%)']
     rows = [(1, [(title, S_TITLE)]),
             (2, [('Días completos registrados por los medidores SMEC (AGRIM02P solar, DAGSR01P conexión a la red).', S_NOTE)]),
             (4, [(h, S_HEAD) for h in hdr])]
@@ -155,18 +157,22 @@ def month_workbook(ym, days):
         for k in range(5):
             tot[k] += v[k]
         cover = ('=IF(F{0}>0,C{0}/F{0},"")'.format(r), round(v[1] / v[4], 4) if v[4] else None)
-        rows.append((r, [((d - EPOCH).days, S_DATE)] + [(r1(x), S_KWH1) for x in v] + [(cover, S_PCT)]))
+        ratio = ('=IF(F{0}>0,B{0}/F{0},"")'.format(r), round(v[0] / v[4], 4) if v[4] else None)
+        rows.append((r, [((d - EPOCH).days, S_DATE)] + [(r1(x), S_KWH1) for x in v] + [(cover, S_PCT), (ratio, S_PCT)]))
         r += 1
     first, last = 5, r - 1
     totrow = [('Total del mes', S_TOTTXT)]
     for k, c in enumerate('BCDEF'):
         totrow.append(((f'=SUM({c}{first}:{c}{last})', r1(tot[k])), S_TOTKWH))
     totrow.append(((f'=IF(F{r}>0,C{r}/F{r},"")', round(tot[1] / tot[4], 4) if tot[4] else None), S_TOTPCT))
+    totrow.append(((f'=IF(F{r}>0,B{r}/F{r},"")', round(tot[0] / tot[4], 4) if tot[4] else None), S_TOTPCT))
     rows.append((r, totrow))
     rows.append((r + 2, [('Solar consumida en sitio = producción solar − inyectada a la red (por intervalo de 15 minutos). '
                           'Consumo total = solar consumida en sitio + comprada a la red.', S_NOTE)]))
-    rows.append((r + 3, [('El detalle de cada 15 minutos está en la hoja «Lecturas 15 min».', S_NOTE)]))
-    resumen = sheet_xml(rows, [13, 14, 16, 14, 14, 16, 12], 4)
+    rows.append((r + 3, [('Cobertura solar = solar consumida en sitio ÷ consumo total. '
+                          'Producción solar ÷ consumo total incluye también lo inyectado a la red (puede superar el 100 %).', S_NOTE)]))
+    rows.append((r + 4, [('El detalle de cada 15 minutos está en la hoja «Lecturas 15 min».', S_NOTE)]))
+    resumen = sheet_xml(rows, [13, 14, 16, 14, 14, 16, 12, 16], 4)
 
     # --- Lecturas 15 min ---
     hdr2 = ['Fecha', 'Intervalo', 'Producción solar (kWh)', 'Solar consumida en sitio (kWh)', 'Comprada a la red (kWh)',
