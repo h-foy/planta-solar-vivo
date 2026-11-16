@@ -95,8 +95,12 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .seg button:focus-visible{outline:2px solid var(--inject);outline-offset:1px}
 .seg button[disabled]{opacity:.45;cursor:default}
 .days{margin:10px 2px 4px}
+.days{overflow-x:auto}
+@media (max-width:420px){.days table{font-size:11px !important}.days th{font-size:10.5px}.days th,.days td{padding:5px 2px}}
 .days table{font-size:12px}
 .days td.today{font-weight:600}
+.days td.parcial{color:var(--ink3);font-weight:400}
+.days td.parcial small{font-size:11px}
 details{margin:12px 0}
 summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 2px}
 /* hourly table: closed state looks like the camera button */
@@ -537,11 +541,17 @@ const F = (function(){
     return t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'numeric'}).replace('.','')+' · '+hhmm(h*15)+'–'+hhmm(h*15+15); };
   // per-day totals
   const tot = a => a.reduce((t,x)=>t+(x||0),0);
-  const rows = hist.map(d => [d.date, tot(d.sol), tot(d.grd), tot(d.inj), false]);
-  rows.push([D.date, T.sol, T.grd, T.inj, true]);
-  let tb = '<table><thead><tr><th>Día</th><th>Solar</th><th>Comprada a la red</th><th>Inyectada</th></tr></thead><tbody>';
-  for (const [iso,a,b,c,today] of rows)
-    tb += '<tr><td'+(today?' class="today"':'')+'>'+dname(iso)+(today && !D.archive ?' (hasta '+D.last+')':'')+'</td><td>'+fmt(a,0)+'</td><td>'+fmt(b,0)+'</td><td>'+fmt(c,0)+'</td></tr>';
+  // consumo total del sitio = solar consumida en sitio (solar - inyectada, cada 15 min) + comprada a la red
+  const dayUse = d => { if (!(d.grd||[]).some(x => x!=null)) return null;
+    let u = tot(d.grd); for (let i=0;i<96;i++) if (d.sol[i]!=null && d.inj[i]!=null) u += Math.max(0, d.sol[i]-d.inj[i]); return u; };
+  const rows = hist.map(d => { const u = dayUse(d); return [d.date, tot(d.sol), tot(d.grd), tot(d.inj), false, u, u>0 ? tot(d.sol)/u : null]; });
+  rows.push([D.date, T.sol, T.grd, T.inj, true, RW.use, RW.use>0 ? RW.sol/RW.use : null]);   // same numbers as the tiles
+  const partial = !D.archive;
+  let tb = '<table><thead><tr><th>Día</th><th>Solar</th><th>Comprada a la red</th><th>Inyectada</th><th>Consumo total</th><th>Solar ÷ consumo</th></tr></thead><tbody>';
+  for (const [iso,a,b,c,today,u,r] of rows)
+    tb += '<tr><td'+(today?' class="today"':'')+'>'+dname(iso)+(today && !D.archive ?' (hasta '+D.last+')':'')+'</td><td>'+fmt(a,0)+'</td><td>'+fmt(b,0)+'</td><td>'+fmt(c,0)+'</td><td>'+(u==null?'–':fmt(u,0))+'</td>'+
+          (today && partial ? '<td class="parcial" title="Día en curso: no comparable con días completos">'+(r==null?'–':Math.round(r*100)+'%')+'<br><small>parcial</small></td>'
+                            : '<td><b>'+(r==null?'–':Math.round(r*100)+'%')+'</b></td>')+'</tr>';
   document.getElementById('days5').innerHTML = tb + '</tbody></table>';
   return f;
 })();
