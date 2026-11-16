@@ -49,6 +49,7 @@ header h1{font-size:20px;margin:4px 0 2px;letter-spacing:-.01em}
 .tile .v{font-size:22px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums}
 .tile .v small{font-size:13px;font-weight:500;color:var(--ink2);margin-left:3px}
 .tile .d{font-size:12px;color:var(--ink3);margin-top:2px}
+.tile.wide{grid-column:1/-1}
 .sw{width:10px;height:10px;border-radius:3px;flex:none}
 .card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:14px 12px 10px;margin:12px 0}
 .card h2{font-size:15px;margin:0 2px 2px}
@@ -356,9 +357,12 @@ const tiles = [
   ['Producción solar', fmt(RT.sol,0)+'<small>kWh</small>', solNote || (D.archive ? 'Pico '+fmt(peakKw,0)+' kW a las '+hhmm(peakI*15+15) : 'Ahora aprox. '+fmt(lastKw,0)+' kW'), '--solar'],
   ['Inyectada a la red', fmt(RT.inj,0)+'<small>kWh</small>', ng<n ? gridNote : pct(RW.inj,RW.sol)+' de la producción solar'+upto, '--inject'],
   ['Cobertura solar', pct(RW.onsite,RW.use), 'del consumo cubierto por solar'+upto, null],
+  ['Producción solar ÷ consumo total', pct(RW.sol,RW.use), RW.use>0 ? (RW.sol>=RW.use
+      ? 'la planta produjo más energía de la que consumió el sitio'+upto
+      : 'la planta produjo el equivalente a esta parte del consumo del sitio'+upto) : 'sin consumo todavía', null, 'wide'],
 ];
-document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c]) =>
-  '<div class="tile"><div class="k">'+(c?'<span class="sw" style="background:var('+c+')"></span>':'')+k+
+document.getElementById('tiles').innerHTML = tiles.map(([k,v,d,c,w]) =>
+  '<div class="tile'+(w?' '+w:'')+'"><div class="k">'+(c?'<span class="sw" style="background:var('+c+')"></span>':'')+k+
   '</div><div class="v">'+v+'</div><div class="d">'+d+'</div></div>').join('');
 
 // ---- legends ----
